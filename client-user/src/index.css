@@ -93,11 +93,15 @@ body {
 .page-hero {
   background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);
   color: #fff;
-  padding: 2.5rem 0 4rem;
-  margin-bottom: -2.5rem;
+  padding: 1.5rem 0 2rem;
+  margin-bottom: 0;
+  position: sticky;
+  top: 64px;
+  z-index: 1010;
+  box-shadow: 0 4px 18px rgba(26,86,219,.25);
 }
-.page-hero h1 { font-weight: 800; }
-.page-hero p  { opacity: .8; }
+.page-hero h1 { font-weight: 800; font-size: 1.6rem; }
+.page-hero p  { opacity: .9; font-size: .9rem; }
 
 /* ---- Feature Cards ---- */
 .feature-card {
@@ -128,6 +132,12 @@ body {
 .ci-purple { background: #f5f3ff; color: #7c3aed; }
 .ci-teal   { background: #f0fdfa; color: #0d9488; }
 
+/* ---- Utility helper for flex overflow ---- */
+.min-w-0 {
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
 /* ---- Report list (Track Status) ---- */
 .report-item {
   display: flex;
@@ -135,6 +145,8 @@ body {
   gap: .75rem;
   padding: .65rem 0;
   border-bottom: 1px solid #f1f5f9;
+  min-width: 0;
+  width: 100%;
 }
 .report-item:last-child { border-bottom: none; }
 
@@ -158,6 +170,8 @@ body {
   border-radius: 10px;
   border-bottom: 1px solid #f1f5f9;
   transition: background var(--transition);
+  min-width: 0;
+  width: 100%;
 }
 .notif-item:last-child { border-bottom: none; }
 .notif-item.unread { background: #eff6ff; }

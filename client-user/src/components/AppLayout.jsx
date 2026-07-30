@@ -8,7 +8,7 @@ import AppNavbar from './Navbar.jsx';
 const AppLayout = () => (
   <>
     <AppNavbar />
-    <main>
+    <main style={{ paddingTop: 64 }}>
       <Outlet />
     </main>
   </>

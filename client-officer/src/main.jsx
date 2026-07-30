@@ -9,6 +9,9 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 // Bootstrap Icons
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
+// Leaflet CSS
+import 'leaflet/dist/leaflet.css';
+
 // Global custom theme styles
 import './assets/styles.css';
 

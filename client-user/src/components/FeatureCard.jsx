@@ -28,11 +28,11 @@ const FeatureCard = ({
   <Card className="feature-card h-100">
     <Card.Body className="d-flex flex-column gap-3 p-4">
       {/* Header row */}
-      <div className="d-flex align-items-center gap-3">
+      <div className="d-flex align-items-center gap-3 min-w-0">
         <div className={`card-icon-wrap ${iconClass}`}>
           <i className={`bi ${icon}`} />
         </div>
-        <div className="flex-grow-1">
+        <div className="flex-grow-1 min-w-0">
           <div className="d-flex align-items-center gap-2 flex-wrap">
             <h2 className="mb-0 fw-bold" style={{ fontSize: '1.05rem', color: '#0f172a' }}>
               {title}
@@ -48,7 +48,7 @@ const FeatureCard = ({
       </div>
 
       {/* Extra content slot */}
-      {children && <div className="flex-grow-1">{children}</div>}
+      {children && <div className="flex-grow-1 min-w-0" style={{ minWidth: 0 }}>{children}</div>}
 
       {/* Footer slot */}
       {footer && <div>{footer}</div>}

@@ -21,7 +21,7 @@ const Notifications = () => {
 
   return (
     <>
-      <div className="page-hero" style={{ paddingTop: 'calc(64px + 2rem)' }}>
+      <div className="page-hero">
         <Container>
           <BackButton fallback="/dashboard" />
           <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">

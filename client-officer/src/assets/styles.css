@@ -128,8 +128,14 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
 /* ── Page headings ──────────────────────────────────────────────────── */
 .scr-page-header {
   border-left: 4px solid var(--scr-navy);
-  padding-left: 14px;
+  padding: 12px 16px;
   margin-bottom: 24px;
+  position: sticky;
+  top: var(--scr-navbar-h);
+  z-index: 1015;
+  background: var(--scr-page-bg);
+  box-shadow: 0 4px 12px rgba(10, 61, 98, 0.07);
+  border-radius: 0 10px 10px 0;
 }
 .scr-page-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--scr-navy); margin: 0; }
 .scr-page-header p  { font-size: 0.875rem; color: #6c757d; margin: 4px 0 0; }

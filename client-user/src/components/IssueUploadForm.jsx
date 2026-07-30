@@ -2,6 +2,8 @@ import { useState, useRef, useCallback } from 'react';
 import { Form, Button, Spinner } from 'react-bootstrap';
 import useGeolocation from '../hooks/useGeolocation.js';
 import { isAllowedMedia, isFileSizeOk } from '../utils/validators.js';
+import MapView from './MapView.jsx';
+import { DEFAULT_COORDS } from '../utils/constants.js';
 
 /**
  * IssueUploadForm.jsx — Complete issue-reporting form component.
@@ -332,33 +334,15 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
           <div className="text-danger mt-1" style={{ fontSize: '.8rem' }}>{errors.location}</div>
         )}
 
-        {/* Mini map preview */}
-        <div
-          className="mt-2"
-          style={{
-            height: 120, borderRadius: 10,
-            background: 'linear-gradient(140deg, #dbeafe, #ede9fe)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            position: 'relative', overflow: 'hidden',
-          }}
-          id="mini-map-preview"
-        >
-          {/* Grid lines */}
-          {[20, 40, 60, 80].map(p => (
-            <div key={`h${p}`} style={{ position: 'absolute', top: `${p}%`, width: '100%', height: 1, background: 'rgba(255,255,255,.5)' }} />
-          ))}
-          {[25, 50, 75].map(p => (
-            <div key={`v${p}`} style={{ position: 'absolute', left: `${p}%`, height: '100%', width: 1, background: 'rgba(255,255,255,.5)' }} />
-          ))}
-          <div style={{
-            width: 20, height: 20, borderRadius: '50%',
-            background: '#1a56db', border: '3px solid #fff',
-            boxShadow: '0 0 0 6px rgba(26,86,219,.2)',
-            zIndex: 2,
-          }} />
-          <span style={{ position: 'absolute', bottom: 8, left: 0, right: 0, textAlign: 'center', fontSize: '.72rem', color: '#64748b' }}>
-            📍 Your location preview
-          </span>
+        {/* Live Leaflet map preview of Ballari / GPS location */}
+        <div className="mt-2" id="mini-map-preview">
+          <MapView
+            center={coords ? [coords.latitude, coords.longitude] : DEFAULT_COORDS}
+            zoom={14}
+            height="180px"
+            showRadius={true}
+            issues={[]}
+          />
         </div>
       </Form.Group>
 
