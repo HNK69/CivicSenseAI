@@ -1,23 +1,15 @@
 /**
- * aiService.js — AI service calls.
+ * aiService.js — AI service facade used by controllers.
  *
- * transcribeAudio: LIVE — uses Groq Whisper API (whisper-large-v3-turbo).
- * All other functions: PLACEHOLDER stubs for future FastAPI ai-service.
+ * transcribeAudio  → LIVE via Groq Whisper (unchanged)
+ * All other fns    → real calls through aiClient.js to the FastAPI ai-service.
  *
- * Set GROQ_API_KEY in .env to enable real transcription.
- * Set AI_SERVICE_URL in .env to enable FastAPI stubs when ready.
+ * Env: AI_SERVICE_URL (default http://localhost:8001), GROQ_API_KEY
  */
 
-const AI_BASE = process.env.AI_SERVICE_URL || '';
+const aiClient = require('./aiClient');
 
-// Lazy-init axios so missing AI_SERVICE_URL doesn't crash startup
-let _axios = null;
-const getAxios = () => {
-  if (!_axios) _axios = require('axios').create({ baseURL: AI_BASE, timeout: 10000 });
-  return _axios;
-};
-
-// Lazy-init Groq client
+// ---- Lazy-init Groq client (for audio transcription only) ----
 let _groq = null;
 const getGroq = () => {
   if (!_groq) {
@@ -27,81 +19,87 @@ const getGroq = () => {
   return _groq;
 };
 
-/* ---- analyzeIssue ---- */
-const analyzeIssue = async (issuePayload) => {
-  // TODO: return (await getAxios().post('/analyze', issuePayload)).data;
-  return {
-    analysisTags:    ['infrastructure', issuePayload.category?.toLowerCase()],
-    summary:         `AI analysis placeholder for "${issuePayload.title}".`,
-    suggestedAction: 'Assign to relevant department.',
-    confidence:      null,
-  };
-};
+/* ============================================================
+   Re-export aiClient functions with the names that
+   existing controllers already import.
+   ============================================================ */
 
-/* ---- detectDuplicate ---- */
-const detectDuplicate = async (issuePayload) => {
-  // TODO: return (await getAxios().post('/duplicate-check', issuePayload)).data;
-  return { isDuplicate: false, duplicateOf: null, similarity: 0 };
-};
-
-/* ---- getPriorityScore ---- */
-const getPriorityScore = async (issuePayload) => {
-  // TODO: return (await getAxios().post('/priority', issuePayload)).data;
-  return { priorityScore: null, priority: issuePayload.priority || 'LOW' };
-};
-
-/* ---- runAIInvestigation ---- */
-const runAIInvestigation = async (issueId) => {
-  // TODO: return (await getAxios().post('/investigate', { issueId })).data;
-  return {
-    issueId,
-    severity: 'MEDIUM',
-    summary: 'AI investigation placeholder — no analysis performed.',
-    suggestedAction: 'Manual review required.',
-    confidence: null,
-    message: 'Analysis queued (placeholder)',
-  };
-};
-
-/* ---- findDuplicateMergeCandidates ---- */
-const findDuplicateMergeCandidates = async (issueId) => {
-  // TODO: return (await getAxios().post('/duplicates', { issueId })).data;
-  return { primaryIssueId: issueId, duplicates: [] };
-};
-
-/* ---- verifyRepair ---- */
-const verifyRepair = async (workOrderId, evidence) => {
-  // TODO: return (await getAxios().post('/verify-repair', { workOrderId, evidence })).data;
-  return { workOrderId, verdict: 'pending', confidence: null, message: 'AI repair verification placeholder.' };
-};
-
-/* ---- transcribeAudio — LIVE via Groq Whisper ---- */
 /**
- * Accepts a Buffer (from multer memoryStorage) or a file path string.
- * Uses Groq's whisper-large-v3-turbo model.
- * Falls back gracefully if the API call fails.
+ * analyzeIssue — wraps aiClient.analyzeComplaint.
+ * Called by issueController after Cloudinary upload.
+ *
+ * @param {object} p
+ * @param {string}   p.text          — full complaint text (title + description)
+ * @param {string[]} p.image_urls
+ * @param {string[]} p.video_urls
+ * @param {{ lat, lng }} p.gps
+ */
+const analyzeIssue = async ({ text, image_urls = [], video_urls = [], gps = null } = {}) =>
+  aiClient.analyzeComplaint({ text, image_urls, video_urls, gps });
+
+/**
+ * detectDuplicate — wraps aiClient.checkDuplicate.
+ * Must be called AFTER analyzeIssue (needs category).
+ * Must be called BEFORE saving complaint to MongoDB.
+ */
+const detectDuplicate = async ({ complaint_id, text, category }) =>
+  aiClient.checkDuplicate({ complaint_id, text, category });
+
+/**
+ * verifyRepairAI — wraps aiClient.verifyRepair.
+ * Returns { verified, confidence, explanation, remaining_issues, diff_summary }
+ */
+const verifyRepairAI = async ({ complaint_id, before_image_urls = [], after_image_urls = [] }) =>
+  aiClient.verifyRepair({ complaint_id, before_image_urls, after_image_urls });
+
+/**
+ * municipalCopilotQuery — wraps aiClient.copilotChat.
+ * complaint_context MUST be pre-fetched by the caller before invoking.
+ */
+const municipalCopilotQuery = async ({
+  message,
+  officer_id,
+  officer_name,
+  officer_department,
+  complaint_context = {},
+  tools = [],
+}) =>
+  aiClient.copilotChat({
+    message,
+    officer_id,
+    officer_name,
+    officer_department,
+    complaint_context,
+    tools,
+  });
+
+/**
+ * getAIHealth — wraps aiClient.getHealth.
+ */
+const getAIHealth = async () => aiClient.getHealth();
+
+/* ============================================================
+   transcribeAudio — LIVE via Groq Whisper (unchanged)
+   ============================================================ */
+/**
+ * Accepts a Buffer (multer memoryStorage) or file path string.
+ * Uses whisper-large-v3-turbo. Falls back gracefully on failure.
  */
 const transcribeAudio = async (audioInput) => {
   if (!process.env.GROQ_API_KEY) {
     console.warn('[aiService] GROQ_API_KEY not set — returning stub transcription.');
     return { text: 'Voice transcription unavailable (API key not configured).' };
   }
-
-  if (!audioInput) {
-    return { text: '' };
-  }
+  if (!audioInput) return { text: '' };
 
   try {
     const groq = getGroq();
     const { toFile } = require('groq-sdk');
 
-    // Use Groq SDK's toFile() helper — the only reliable way to build
-    // a multipart-compatible file object that the SDK's upload internals accept.
     let fileObj;
     if (Buffer.isBuffer(audioInput)) {
       fileObj = await toFile(audioInput, 'recording.webm', { type: 'audio/webm' });
     } else {
-      // It's a file path — stream it via toFile
       const fs = require('fs');
       fileObj = await toFile(fs.createReadStream(audioInput), 'recording.webm', { type: 'audio/webm' });
     }
@@ -116,32 +114,17 @@ const transcribeAudio = async (audioInput) => {
     const text = transcription?.text?.trim() || '';
     console.log(`[aiService] Groq transcription complete (${text.length} chars).`);
     return { text };
-
   } catch (err) {
     console.error('[aiService] Groq transcription failed:', err.message);
-    // Return empty string so caller can decide what to show the user
     return { text: '', error: err.message };
   }
-};
-
-
-/* ---- municipalCopilotQuery ---- */
-const municipalCopilotQuery = async (query, ctx = {}) => {
-  // TODO: return (await getAxios().post('/copilot', { query, context: ctx })).data;
-  return {
-    role: 'ai',
-    text: `[AI Response Placeholder] You asked: "${query}". Connect the FastAPI ai-service to get a real answer.`,
-    ts:   new Date().toISOString(),
-  };
 };
 
 module.exports = {
   analyzeIssue,
   detectDuplicate,
-  getPriorityScore,
-  runAIInvestigation,
-  findDuplicateMergeCandidates,
-  verifyRepair,
-  transcribeAudio,
+  verifyRepairAI,
   municipalCopilotQuery,
+  getAIHealth,
+  transcribeAudio,
 };

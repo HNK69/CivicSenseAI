@@ -38,9 +38,13 @@ const workOrderSchema = new mongoose.Schema(
     cost:  { type: Number, default: null },
     notes: { type: String, default: null },
 
-    // Repair verification media
+    // Repair verification media (single legacy fields kept for backward compat)
     beforeImage: { url: String, publicId: String },
     afterImage:  { url: String, publicId: String },
+
+    // Multi-image arrays for AI verify-repair endpoint
+    before_image_urls: [{ type: String }],
+    after_image_urls:  [{ type: String }],
 
     // Verdict from officer (or AI) verification
     verificationVerdict: {
@@ -49,6 +53,20 @@ const workOrderSchema = new mongoose.Schema(
       default: null,
     },
     verificationNote: { type: String, default: null },
+
+    // AI Repair Verification result (from /api/v1/verify-repair)
+    ai_repair_verification: {
+      verified:         { type: Boolean, default: null },
+      confidence:       { type: Number, default: null },
+      explanation:      { type: String, default: null },
+      remaining_issues: [{ type: String }],
+      diff_summary: {
+        pixel_diff_score:  { type: Number, default: null },
+        change_percentage: { type: Number, default: null },
+        pairs_compared:    { type: Number, default: null },
+      },
+      verified_at: { type: Date, default: null },
+    },
 
     history: [workOrderHistorySchema],
   },

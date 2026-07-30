@@ -5,6 +5,7 @@ const connectDB  = require('./config/db');
 const { initSocket } = require('./config/socket');
 const { initSocketHandler } = require('./sockets/socketHandler');
 const { startCleanupJob } = require('./services/cleanupService');
+const { startMonitor: startAIMonitor } = require('./services/aiHealthMonitor');
 
 
 const PORT = process.env.PORT || 5000;
@@ -21,6 +22,9 @@ const start = async () => {
 
   // 2. Start scheduled jobs
   startCleanupJob();
+
+  // 3. Start AI service health monitor (polls every 30s per spec)
+  startAIMonitor(30000);
 
   // 3. Start HTTP server
   httpServer.listen(PORT, () => {

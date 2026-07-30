@@ -33,18 +33,87 @@ const internalNoteSchema = new mongoose.Schema(
   { _id: true }
 );
 
+/* ── AI Analysis (from /api/v1/analyze) ────────────────────────────── */
+const mediaFailedSchema = new mongoose.Schema(
+  { url: String, reason: String },
+  { _id: false }
+);
+
+const aiAnalysisSchema = new mongoose.Schema(
+  {
+    // Core classification
+    category:          { type: String, default: null },
+    severity:          { type: String, default: null },
+    priority:          { type: String, default: null },
+
+    // Department routing — iterate departments[], not just primary_department
+    primary_department: { type: String, default: null },
+    departments:        [{ type: String }],       // always contains primary_department, no duplicates
+    department:         { type: String, default: null }, // alias === primary_department (back-compat)
+
+    // Narrative
+    summary:      { type: String, default: null },
+    confidence:   { type: Number, default: null },
+    analysisTags: [{ type: String }],
+    reasoning:    { type: String, default: null },
+
+    // Media processing status — informational, never blocks the request
+    media_processed: { type: Number, default: 0 },
+    media_failed:    [mediaFailedSchema],
+
+    analyzed_at: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+/* ── Duplicate Check (from /api/v1/check-duplicate) ─────────────────── */
+const duplicateCheckSchema = new mongoose.Schema(
+  {
+    is_duplicate:         { type: Boolean, default: null },
+    duplicate_of:         { type: mongoose.Schema.Types.ObjectId, ref: 'Issue', default: null },
+    similarity_score:     { type: Number, default: null },
+    confidence:           { type: Number, default: null },
+    candidates_evaluated: { type: Number, default: null },
+    checked_at:           { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+/* ── Repair Verification (from /api/v1/verify-repair) ───────────────── */
+const diffSummarySchema = new mongoose.Schema(
+  {
+    pixel_diff_score:  { type: Number, default: null },
+    change_percentage: { type: Number, default: null },
+    pairs_compared:    { type: Number, default: null },
+  },
+  { _id: false }
+);
+
+const repairVerificationSchema = new mongoose.Schema(
+  {
+    verified:         { type: Boolean, default: null },
+    confidence:       { type: Number, default: null },
+    explanation:      { type: String, default: null },
+    remaining_issues: [{ type: String }],
+    diff_summary:     { type: diffSummarySchema, default: null },
+    verified_at:      { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+/* ── Main Issue Schema ───────────────────────────────────────────────── */
 const issueSchema = new mongoose.Schema(
   {
     title:       { type: String, required: true, trim: true },
     description: { type: String, required: true },
-    category:    {
+    category: {
       type: String,
       enum: ['Roads', 'Water', 'Electricity', 'Sanitation', 'Parks', 'Other'],
       required: true,
     },
     subCategory: { type: String, default: null },
 
-    // Media
+    // Media (Cloudinary URLs — always long-lived/public)
     images: [{ url: String, publicId: String }],
     videos: [{ url: String, publicId: String }],
 
@@ -72,11 +141,12 @@ const issueSchema = new mongoose.Schema(
     // Ownership
     createdBy:          { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     assignedOfficer:    { type: mongoose.Schema.Types.ObjectId, ref: 'Officer', default: null },
-    assignedDepartment: { type: String, default: null }, // e.g. "PWD", "Sanitation"
+    assignedDepartment: { type: String, default: null }, // primary department for routing
 
     // Officer-side
     internalNotes: [internalNoteSchema],
     workOrder:     { type: mongoose.Schema.Types.ObjectId, ref: 'WorkOrder', default: null },
+    workOrders:    [{ type: mongoose.Schema.Types.ObjectId, ref: 'WorkOrder' }], // multi-dept routing
 
     // Audit trail
     statusHistory: [statusHistorySchema],
@@ -85,7 +155,12 @@ const issueSchema = new mongoose.Schema(
     upvoteCount: { type: Number, default: 0 },
     upvotedBy:   [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
-    // AI metadata — placeholder only, populated by ai-service
+    // ── Full AI results from FastAPI ai-service ──────────────────────
+    ai_analysis:       { type: aiAnalysisSchema, default: null },
+    duplicate_check:   { type: duplicateCheckSchema, default: null },
+    repair_verification: { type: repairVerificationSchema, default: null },
+
+    // ── Legacy aiMeta (kept for backward-compat with existing queries) ──
     aiMeta: {
       duplicateOf:    { type: mongoose.Schema.Types.ObjectId, ref: 'Issue', default: null },
       priorityScore:  { type: Number, default: null },
@@ -111,5 +186,9 @@ issueSchema.index({ title: 'text', description: 'text' });
 issueSchema.index({ createdBy: 1, status: 1 });
 issueSchema.index({ assignedDepartment: 1, status: 1 });
 issueSchema.index({ priority: 1, status: 1 });
+
+// AI fields
+issueSchema.index({ 'ai_analysis.category': 1 });
+issueSchema.index({ 'duplicate_check.is_duplicate': 1 });
 
 module.exports = mongoose.model('Issue', issueSchema);

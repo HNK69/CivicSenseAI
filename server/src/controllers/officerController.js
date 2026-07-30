@@ -8,6 +8,8 @@ const { success, created, error, paginated } = require('../utils/response');
 const paginate = require('../utils/paginate');
 const { notifyNewAssignment } = require('../services/notificationService');
 const { emitToIssueRoom, emitToDepartment, emitToOfficer } = require('../sockets/socketHandler');
+const { verifyRepairAI, municipalCopilotQuery } = require('../services/aiService');
+
 
 /* ====================================================================
    CATEGORY → DEPARTMENT mapping (kept consistent with issueController)
@@ -327,47 +329,116 @@ exports.verifyRepairOfficer = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
 
-  const { verdict, note } = req.body;
-  if (!['approved', 'rejected'].includes(verdict))
-    return error(res, 'verdict must be "approved" or "rejected"', 400);
-
   const wo = await WorkOrder.findById(req.params.id).populate('issue');
   if (!wo) return error(res, 'Work order not found', 404);
 
-  wo.verificationVerdict = verdict;
-  wo.verificationNote    = note || null;
-  wo.status              = verdict === 'approved' ? 'verified' : 'in_progress';
-  wo.history.push({
-    action:    `repair ${verdict}`,
-    note:      note || null,
-    changedBy: req.officer._id,
-    changedAt: new Date(),
-  });
-  await wo.save();
+  // ---- Build image URL arrays for AI service ----
+  const before_image_urls = wo.before_image_urls?.length
+    ? wo.before_image_urls
+    : [wo.beforeImage?.url].filter(Boolean);
 
-  // Update linked issue
-  if (wo.issue && verdict === 'approved') {
+  const after_image_urls = wo.after_image_urls?.length
+    ? wo.after_image_urls
+    : [wo.afterImage?.url].filter(Boolean);
+
+  const complaint_id = (wo.issue?._id || wo.issue)?.toString();
+
+  // ---- Call AI verify-repair ----
+  let aiResult = null;
+  let aiError  = null;
+  try {
+    aiResult = await verifyRepairAI({ complaint_id, before_image_urls, after_image_urls });
+  } catch (aiErr) {
+    aiError = aiErr.message;
+    console.error('[officerController] verifyRepairAI failed:', aiErr.message);
+  }
+
+  // ---- Business rule: ONLY mark resolved if verified === true (spec §5) ----
+  const aiVerified = aiResult?.verified === true;
+
+  // Low-confidence flag: confidence < 0.6 → recommend review but do NOT hard-block
+  const lowConfidence = aiResult?.confidence !== undefined && aiResult.confidence !== null &&
+                        aiResult.confidence < 0.6;
+
+  // Persist AI result on work order
+  wo.ai_repair_verification = aiResult ? {
+    verified:         aiResult.verified ?? null,
+    confidence:       aiResult.confidence ?? null,
+    explanation:      aiResult.explanation || null,
+    remaining_issues: aiResult.remaining_issues || [],
+    diff_summary:     aiResult.diff_summary || null,
+    verified_at:      new Date(),
+  } : null;
+
+  // Persist on issue too
+  if (wo.issue?._id) {
     await Issue.findByIdAndUpdate(wo.issue._id, {
-      status: 'resolved',
-      $push: { statusHistory: {
-        status:    'resolved',
-        changedAt: new Date(),
-        changedByModel: 'Officer',
-        changedBy: req.officer._id,
-        note:      'Repair verified by officer',
-      }},
-    });
-
-    emitToIssueRoom(wo.issue._id.toString(), 'issue:statusUpdated', {
-      issueId: wo.issue._id, status: 'resolved',
+      repair_verification: wo.ai_repair_verification,
     });
   }
 
-  // AI stub
-  const { verifyRepair: aiVerify } = require('../services/aiService');
-  aiVerify(wo._id.toString(), { verdict, note }).catch(() => {});
+  if (aiVerified) {
+    // AI says verified — mark resolved
+    wo.verificationVerdict = 'approved';
+    wo.verificationNote    = aiResult.explanation || null;
+    wo.status              = 'verified';
+    wo.history.push({
+      action:    'repair approved by AI verification',
+      note:      aiResult.explanation || null,
+      changedBy: req.officer._id,
+      changedAt: new Date(),
+    });
+    await wo.save();
 
-  return success(res, { workOrder: wo }, `Repair ${verdict}`);
+    if (wo.issue?._id) {
+      await Issue.findByIdAndUpdate(wo.issue._id, {
+        status: 'resolved',
+        $push: { statusHistory: {
+          status:    'resolved',
+          changedAt: new Date(),
+          changedByModel: 'Officer',
+          changedBy: req.officer._id,
+          note:      'Repair verified by AI',
+        }},
+      });
+      emitToIssueRoom(wo.issue._id.toString(), 'issue:statusUpdated', {
+        issueId: wo.issue._id, status: 'resolved',
+      });
+    }
+
+    return success(res, {
+      workOrder:    wo,
+      aiVerified:   true,
+      confidence:   aiResult.confidence,
+      explanation:  aiResult.explanation,
+      lowConfidence,
+      reviewRecommended: lowConfidence,
+    }, 'Repair verified — issue marked resolved');
+
+  } else {
+    // AI says NOT verified (or AI call failed) — keep issue open
+    wo.verificationVerdict = 'rejected';
+    wo.verificationNote    = aiResult?.explanation || aiError || 'Repair not verified by AI';
+    wo.status              = 'in_progress';
+    wo.history.push({
+      action:    'repair rejected by AI verification',
+      note:      wo.verificationNote,
+      changedBy: req.officer._id,
+      changedAt: new Date(),
+    });
+    await wo.save();
+
+    // Issue stays open — do NOT auto-close (spec §5)
+    return success(res, {
+      workOrder:       wo,
+      aiVerified:      false,
+      confidence:      aiResult?.confidence ?? null,
+      explanation:     aiResult?.explanation || aiError || null,
+      remaining_issues: aiResult?.remaining_issues || [],
+      lowConfidence,
+      message:         'Repair not verified. Issue remains open. See remaining_issues for details.',
+    }, 'Repair verification failed — issue remains open');
+  }
 });
 
 /* ====================================================================
@@ -442,13 +513,56 @@ exports.getCopilotHistory = asyncHandler(async (req, res) => {
  * Body: { message }
  */
 exports.sendCopilotMessage = asyncHandler(async (req, res) => {
-  const { message } = req.body;
+  const { message, issueId } = req.body;
   if (!message?.trim()) return error(res, 'message is required', 400);
 
-  const { municipalCopilotQuery } = require('../services/aiService');
-  const reply = await municipalCopilotQuery(message, { officerId: req.officer._id });
+  // Pre-fetch complaint context server-side — Gemma has no grounding without it (spec §3)
+  let complaint_context = {};
+  if (issueId) {
+    try {
+      const issue = await Issue.findById(issueId)
+        .populate('createdBy',       'name ward city')
+        .populate('assignedOfficer', 'name designation department')
+        .lean();
+      if (issue) {
+        complaint_context = {
+          id:                 issue._id,
+          title:              issue.title,
+          description:        issue.description,
+          category:           issue.category,
+          status:             issue.status,
+          priority:           issue.priority,
+          address:            issue.address,
+          assignedDepartment: issue.assignedDepartment,
+          createdAt:          issue.createdAt,
+          ai_analysis:        issue.ai_analysis || null,
+          duplicate_check:    issue.duplicate_check || null,
+          repair_verification:issue.repair_verification || null,
+        };
+      }
+    } catch (ctxErr) {
+      console.warn('[officerController] Failed to fetch complaint context:', ctxErr.message);
+    }
+  }
 
-  return success(res, { reply });
+  let reply;
+  try {
+    reply = await municipalCopilotQuery({
+      message,
+      officer_id:         req.officer._id.toString(),
+      officer_name:       req.officer.name,
+      officer_department: req.officer.department,
+      complaint_context,
+      tools:              [],
+    });
+  } catch (aiErr) {
+    if (aiErr.status === 503) {
+      return error(res, 'AI assistant temporarily unavailable. Please try again shortly.', 503);
+    }
+    throw aiErr;
+  }
+
+  return success(res, { reply: reply?.response || reply, complaint_context });
 });
 
 /* ====================================================================

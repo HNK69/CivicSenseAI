@@ -5,7 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { success, created, error, paginated } = require('../utils/response');
 const paginate  = require('../utils/paginate');
 const { buildGeoPoint, nearbyFilter } = require('../services/mapService');
-const { analyzeIssue, detectDuplicate, getPriorityScore } = require('../services/aiService');
+const { analyzeIssue, detectDuplicate, transcribeAudio } = require('../services/aiService');
 const { notifyStatusChange, notifyNewAssignment } = require('../services/notificationService');
 const { emitToIssueRoom, emitToDepartment } = require('../sockets/socketHandler');
 
@@ -27,6 +27,11 @@ const DEPT_MAP = {
   Other:       'General',
 };
 
+/**
+ * Deduplicate an array of strings.
+ */
+const unique = (arr) => [...new Set(arr.filter(Boolean))];
+
 /* ====================================================================
    CITIZEN — Issue Controller Functions
    ==================================================================== */
@@ -34,6 +39,12 @@ const DEPT_MAP = {
 /**
  * POST /api/issues
  * Create a new civic issue. Media handled by uploadMiddleware before this.
+ *
+ * AI flow (MUST follow this order per spec):
+ *  1. Call /analyze  → get category, departments[], priority, summary, etc.
+ *  2. Call /check-duplicate (needs category from step 1, BEFORE saving to Mongo)
+ *  3a. If is_duplicate → do NOT save, link citizen to duplicate_of
+ *  3b. If not duplicate → save, then create one WorkOrder per department in departments[]
  */
 exports.citizenCreateIssue = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -46,52 +57,165 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
     ? buildGeoPoint(latitude, longitude)
     : { type: 'Point', coordinates: [0, 0] };
 
-  // Auto-assign department based on category
-  const assignedDepartment = DEPT_MAP[category] || 'General';
-
   // Collect uploaded media from uploadMiddleware
   const { images = [], videos = [] } = req.uploadedMedia || {};
+  const image_urls = images.map((m) => m.url).filter(Boolean);
+  const video_urls = videos.map((m) => m.url).filter(Boolean); // always array, never singular
 
+  const gps = (latitude && longitude)
+    ? { lat: parseFloat(latitude), lng: parseFloat(longitude) }
+    : null;
+
+  const fullText = [title, description].filter(Boolean).join('\n');
+
+  /* ---- Step 1: analyzeComplaint ---- */
+  let aiAnalysis = null;
+  try {
+    aiAnalysis = await analyzeIssue({ text: fullText, image_urls, video_urls, gps });
+    console.log(`[issueController] analyzeComplaint done: category=${aiAnalysis?.category}`);
+  } catch (aiErr) {
+    console.error('[issueController] analyzeComplaint failed:', aiErr.message);
+    // Non-fatal — proceed with user-supplied category
+  }
+
+  // Use AI category if provided, else fall back to user-submitted
+  const resolvedCategory = aiAnalysis?.category || category;
+
+  // Build departments[] from AI result — always iterate the array (spec §5)
+  let departments = aiAnalysis?.departments?.length
+    ? unique(aiAnalysis.departments)
+    : [DEPT_MAP[resolvedCategory] || 'General'];
+
+  const primaryDepartment = aiAnalysis?.primary_department || departments[0];
+
+  // Ensure primary_department is in departments[] with no duplicates
+  departments = unique([primaryDepartment, ...departments]);
+
+  // Priority from AI, or fall back to 'LOW'
+  const resolvedPriority = aiAnalysis?.priority || 'LOW';
+  const assignedDepartment = primaryDepartment;
+
+  /* ---- Step 2: checkDuplicate (BEFORE saving to MongoDB) ---- */
+  // We need a temporary ID to pass to the AI service. We'll use a new ObjectId
+  // for the complaint_id parameter; we'll only save if not duplicate.
+  const tempId = new mongoose.Types.ObjectId();
+
+  let duplicateResult = null;
+  try {
+    duplicateResult = await detectDuplicate({
+      complaint_id: tempId.toString(),
+      text:         fullText,
+      category:     resolvedCategory,
+    });
+    console.log(`[issueController] checkDuplicate done: is_duplicate=${duplicateResult?.is_duplicate}`);
+  } catch (dupErr) {
+    console.error('[issueController] checkDuplicate failed:', dupErr.message);
+    // Non-fatal — proceed as not-duplicate
+  }
+
+  /* ---- Step 3a: Duplicate — do NOT save, return link ---- */
+  if (duplicateResult?.is_duplicate === true) {
+    return success(res, {
+      isDuplicate:  true,
+      duplicate_of: duplicateResult.duplicate_of,
+      similarity:   duplicateResult.similarity_score,
+      message:      'A similar issue has already been reported. Your report has been linked to it.',
+    }, 'Duplicate issue detected');
+  }
+
+  /* ---- Step 3b: Not duplicate — save the complaint ---- */
   const issue = await Issue.create({
+    _id:          tempId,          // reuse the same ID we gave the AI service
     title,
     description,
-    category,
-    subCategory:        subCategory || null,
+    category:     resolvedCategory,
+    subCategory:  subCategory || null,
     location,
-    address:            address     || null,
+    address:      address || null,
     assignedDepartment,
-    createdBy:          GUEST_ID,
+    createdBy:    GUEST_ID,
     images,
     videos,
-    status:             'reported',
+    priority:     resolvedPriority,
+    status:       'reported',
     statusHistory: [{
       status:    'reported',
       changedAt: new Date(),
       changedByModel: 'User',
       changedBy: GUEST_ID,
     }],
+
+    // Persist full AI analysis result
+    ai_analysis: aiAnalysis ? {
+      category:           aiAnalysis.category || null,
+      severity:           aiAnalysis.severity || null,
+      priority:           aiAnalysis.priority || null,
+      primary_department: primaryDepartment,
+      departments,
+      department:         primaryDepartment, // alias for back-compat
+      summary:            aiAnalysis.summary || null,
+      confidence:         aiAnalysis.confidence ?? null,
+      analysisTags:       aiAnalysis.analysisTags || [],
+      reasoning:          aiAnalysis.reasoning || null,
+      media_processed:    aiAnalysis.media_processed ?? 0,
+      media_failed:       aiAnalysis.media_failed || [],   // informational only
+      analyzed_at:        new Date(),
+    } : null,
+
+    // Persist duplicate check result
+    duplicate_check: duplicateResult ? {
+      is_duplicate:         duplicateResult.is_duplicate ?? false,
+      duplicate_of:         duplicateResult.duplicate_of || null,
+      similarity_score:     duplicateResult.similarity_score ?? null,
+      confidence:           duplicateResult.confidence ?? null,
+      candidates_evaluated: duplicateResult.candidates_evaluated ?? null,
+      checked_at:           new Date(),
+    } : null,
+
+    // Back-compat aiMeta
+    aiMeta: {
+      analysisTags:    aiAnalysis?.analysisTags || [],
+      summary:         aiAnalysis?.summary || null,
+      suggestedAction: null,
+      duplicateOf:     null,
+      confidence:      aiAnalysis?.confidence ?? null,
+    },
   });
 
-  // AI stubs — fire-and-forget, never block the response
-  Promise.all([
-    analyzeIssue({ title, description, category }),
-    detectDuplicate({ title, description, location }),
-    getPriorityScore({ category, description }),
-  ])
-    .then(([analysis, dupCheck, priorityResult]) => {
-      issue.aiMeta = {
-        analysisTags:    analysis.analysisTags,
-        summary:         analysis.summary,
-        suggestedAction: analysis.suggestedAction,
-        duplicateOf:     dupCheck.duplicateOf || null,
-        priorityScore:   priorityResult.priorityScore,
-      };
-      if (priorityResult.priority) issue.priority = priorityResult.priority;
-      return issue.save({ validateBeforeSave: false });
-    })
-    .catch(err => console.warn('[issueController] AI stub error:', err.message));
+  /* ---- Create one WorkOrder per department in departments[] ---- */
+  const workOrderIds = [];
+  for (const dept of departments) {
+    try {
+      const wo = await WorkOrder.create({
+        issue:      issue._id,
+        issueTitle: issue.title,
+        department: dept,
+        status:     'pending',
+        history: [{
+          action:    'created by AI routing',
+          changedAt: new Date(),
+        }],
+      });
+      workOrderIds.push(wo._id);
+      emitToDepartment(dept, 'issue:assigned', {
+        issueId:     issue._id,
+        title:       issue.title,
+        workOrderId: wo._id,
+        department:  dept,
+      });
+    } catch (woErr) {
+      console.error(`[issueController] Failed to create WorkOrder for dept "${dept}":`, woErr.message);
+    }
+  }
 
-  return created(res, { issue }, 'Issue reported successfully');
+  // Link first work order to issue (back-compat) + multi-dept array
+  if (workOrderIds.length > 0) {
+    issue.workOrder  = workOrderIds[0];
+    issue.workOrders = workOrderIds;
+    await issue.save({ validateBeforeSave: false });
+  }
+
+  return created(res, { issue, issueId: issue._id.toString() }, 'Issue reported successfully');
 });
 
 /**
@@ -138,7 +262,7 @@ exports.citizenGetNearby = asyncHandler(async (req, res) => {
   const geoFilter = nearbyFilter(lat, lng, parseFloat(radius));
   const issues = await Issue.find({ ...geoFilter, isDeleted: false })
     .limit(parseInt(limit))
-    .select('title category status priority location address aiMeta createdAt')
+    .select('title category status priority location address ai_analysis aiMeta createdAt')
     .lean();
 
   return success(res, { issues });
@@ -170,9 +294,7 @@ exports.citizenUpdateIssue = asyncHandler(async (req, res) => {
  * DELETE /api/issues/:id  (soft delete)
  */
 exports.citizenDeleteIssue = asyncHandler(async (req, res) => {
-  const issue = await Issue.findOne({
-    _id: req.params.id,
-  });
+  const issue = await Issue.findOne({ _id: req.params.id });
   if (!issue) return error(res, 'Issue not found', 404);
 
   issue.isDeleted = true;
@@ -208,15 +330,12 @@ exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
   if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
 
   const { confirmed, reason } = req.body;
-  const issue = await Issue.findOne({
-    _id: req.params.id,
-  });
+  const issue = await Issue.findOne({ _id: req.params.id });
   if (!issue) return error(res, 'Issue not found', 404);
   if (issue.status !== 'resolved')
     return error(res, 'Issue is not marked as resolved yet', 400);
 
   if (confirmed) {
-    // Citizen confirms — close it
     issue.statusHistory.push({
       status:    'resolved',
       changedAt: new Date(),
@@ -225,7 +344,6 @@ exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
       note:      'Confirmed fixed by citizen',
     });
   } else {
-    // Citizen disputes — reopen
     issue.status = 'reopened';
     issue.statusHistory.push({
       status:    'reopened',
@@ -247,7 +365,6 @@ exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
  * Audio voice transcription via Groq Whisper.
  */
 exports.transcribeVoice = asyncHandler(async (req, res) => {
-  const { transcribeAudio } = require('../services/aiService');
   const audioFile = req.file;
   if (!audioFile) return error(res, 'No audio file received', 400);
 
@@ -318,7 +435,6 @@ exports.officerGetIssue = asyncHandler(async (req, res) => {
 /**
  * PATCH /api/officer/issues/:id/status
  * Body: { status, note? }
- * Maps: client-officer's updateIssueStatus(id, status) → PATCH /api/officer/issues/:id/status
  */
 exports.officerUpdateStatus = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -332,6 +448,19 @@ exports.officerUpdateStatus = asyncHandler(async (req, res) => {
   const issue = await Issue.findById(req.params.id);
   if (!issue || issue.isDeleted) return error(res, 'Issue not found', 404);
 
+  // Never allow manual resolved unless repair_verification.verified === true (spec §5)
+  if (status === 'resolved') {
+    const verif = issue.repair_verification;
+    if (!verif || verif.verified !== true) {
+      return error(
+        res,
+        'Cannot mark as resolved: AI repair verification not confirmed (verified !== true). ' +
+        'Upload after-photos and run AI verification first.',
+        400
+      );
+    }
+  }
+
   const prevStatus = issue.status;
   issue.status = status;
   issue.statusHistory.push({
@@ -343,7 +472,6 @@ exports.officerUpdateStatus = asyncHandler(async (req, res) => {
   });
   await issue.save();
 
-  // Notify citizen
   await notifyStatusChange({
     userId:     issue.createdBy,
     issueId:    issue._id,
@@ -351,7 +479,6 @@ exports.officerUpdateStatus = asyncHandler(async (req, res) => {
     newStatus:  status,
   });
 
-  // Emit to issue room
   emitToIssueRoom(issue._id.toString(), 'issue:statusUpdated', {
     issueId: issue._id, prevStatus, status, changedBy: req.officer.name,
   });
@@ -386,7 +513,6 @@ exports.officerAssignIssue = asyncHandler(async (req, res) => {
   });
   await issue.save();
 
-  // Notify assigned officer
   if (officerId) {
     await notifyNewAssignment({
       officerId,
@@ -396,19 +522,16 @@ exports.officerAssignIssue = asyncHandler(async (req, res) => {
     });
   }
 
-  // Emit to department room
   if (department) {
     emitToDepartment(department, 'issue:assigned', {
       issueId: issue._id, title: issue.title, department,
     });
   }
 
-  // Emit to issue room
   emitToIssueRoom(issue._id.toString(), 'issue:assigned', {
     issueId: issue._id, officerId, department,
   });
 
-  // Notify citizen
   await notifyStatusChange({
     userId:     issue.createdBy,
     issueId:    issue._id,
@@ -443,7 +566,6 @@ exports.officerAddNote = asyncHandler(async (req, res) => {
 /**
  * PATCH /api/officer/issues/:id/priority
  * Body: { priority }
- * Supports: client-officer's overridePriority(id, priority)
  */
 exports.officerSetPriority = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -453,23 +575,17 @@ exports.officerSetPriority = asyncHandler(async (req, res) => {
   const VALID = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
   if (!VALID.includes(priority)) return error(res, `Priority must be one of: ${VALID.join(', ')}`, 400);
 
-  const issue = await Issue.findByIdAndUpdate(
-    req.params.id,
-    { priority },
-    { new: true }
-  );
+  const issue = await Issue.findByIdAndUpdate(req.params.id, { priority }, { new: true });
   if (!issue) return error(res, 'Issue not found', 404);
   return success(res, { issue }, 'Priority updated');
 });
 
 /**
  * GET /api/officer/issues/prioritized
- * Returns issues ranked by score (upvoteCount + daysOpen + priority weight).
- * Mirrors: client-officer's getPrioritizedIssues()
  */
 exports.officerGetPrioritized = asyncHandler(async (req, res) => {
   const issues = await Issue.find({ isDeleted: false, status: { $nin: ['resolved', 'rejected'] } })
-    .select('title category status priority upvoteCount createdAt aiMeta')
+    .select('title category status priority upvoteCount createdAt ai_analysis aiMeta')
     .lean();
 
   const PRIORITY_WEIGHT = { CRITICAL: 40, HIGH: 20, MEDIUM: 10, LOW: 0 };
@@ -489,19 +605,25 @@ exports.officerGetPrioritized = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/officer/duplicates
- * Find duplicate groups (by AI meta or proximity matching).
- * Supports: client-officer's getDuplicateGroups()
  */
 exports.officerGetDuplicates = asyncHandler(async (req, res) => {
   const withDupMeta = await Issue.find({
-    'aiMeta.duplicateOf': { $ne: null },
+    $or: [
+      { 'duplicate_check.is_duplicate': true },
+      { 'aiMeta.duplicateOf': { $ne: null } },
+    ],
     isDeleted: false,
-  }).populate('aiMeta.duplicateOf', 'title').lean();
+  }).populate('duplicate_check.duplicate_of', 'title')
+    .populate('aiMeta.duplicateOf', 'title')
+    .lean();
 
-  // Group by primary
   const groups = {};
   for (const issue of withDupMeta) {
-    const primaryId = issue.aiMeta.duplicateOf._id.toString();
+    const primaryId = (
+      issue.duplicate_check?.duplicate_of?._id ||
+      issue.aiMeta?.duplicateOf?._id
+    )?.toString();
+    if (!primaryId) continue;
     if (!groups[primaryId]) {
       groups[primaryId] = { primaryIssueId: primaryId, duplicates: [] };
     }
@@ -511,6 +633,7 @@ exports.officerGetDuplicates = asyncHandler(async (req, res) => {
       reportedBy: issue.createdBy,
       createdAt:  issue.createdAt,
       upvotes:    issue.upvoteCount,
+      similarity: issue.duplicate_check?.similarity_score,
     });
   }
 
@@ -520,7 +643,6 @@ exports.officerGetDuplicates = asyncHandler(async (req, res) => {
 /**
  * POST /api/officer/duplicates/merge
  * Body: { primaryId, dupIds[] }
- * Supports: client-officer's mergeDuplicates()
  */
 exports.officerMergeDuplicates = asyncHandler(async (req, res) => {
   const { primaryId, dupIds } = req.body;
@@ -529,33 +651,73 @@ exports.officerMergeDuplicates = asyncHandler(async (req, res) => {
 
   await Issue.updateMany(
     { _id: { $in: dupIds } },
-    { $set: { 'aiMeta.duplicateOf': primaryId, isDeleted: true } }
+    {
+      $set: {
+        'aiMeta.duplicateOf':          primaryId,
+        'duplicate_check.is_duplicate': true,
+        'duplicate_check.duplicate_of': primaryId,
+        isDeleted:                      true,
+      },
+    }
   );
 
   return success(res, { primaryId, mergedCount: dupIds.length }, 'Duplicates merged');
 });
 
 /**
- * POST /api/officer/issues/:id/investigate  (AI stub)
- * Supports: client-officer's triggerAnalysis(issueId)
+ * POST /api/officer/issues/:id/investigate  (re-run AI analysis)
  */
 exports.officerInvestigate = asyncHandler(async (req, res) => {
-  const { runAIInvestigation } = require('../services/aiService');
-  const result = await runAIInvestigation(req.params.id);
+  const issue = await Issue.findById(req.params.id);
+  if (!issue || issue.isDeleted) return error(res, 'Issue not found', 404);
+
+  const fullText = [issue.title, issue.description].filter(Boolean).join('\n');
+  const image_urls = (issue.images || []).map((m) => m.url).filter(Boolean);
+  const video_urls = (issue.videos || []).map((m) => m.url).filter(Boolean);
+  const gps = (issue.location?.coordinates?.length === 2 && issue.location.coordinates[0] !== 0)
+    ? { lat: issue.location.coordinates[1], lng: issue.location.coordinates[0] }
+    : null;
+
+  let result;
+  try {
+    result = await analyzeIssue({ text: fullText, image_urls, video_urls, gps });
+    // Persist updated analysis
+    issue.ai_analysis = {
+      category:           result.category || null,
+      severity:           result.severity || null,
+      priority:           result.priority || null,
+      primary_department: result.primary_department || null,
+      departments:        result.departments || [],
+      department:         result.primary_department || null,
+      summary:            result.summary || null,
+      confidence:         result.confidence ?? null,
+      analysisTags:       result.analysisTags || [],
+      reasoning:          result.reasoning || null,
+      media_processed:    result.media_processed ?? 0,
+      media_failed:       result.media_failed || [],
+      analyzed_at:        new Date(),
+    };
+    if (result.priority) issue.priority = result.priority;
+    await issue.save({ validateBeforeSave: false });
+  } catch (aiErr) {
+    return error(res, `AI investigation failed: ${aiErr.message}`, 502);
+  }
+
   return success(res, { result }, 'Investigation triggered');
 });
 
 /**
  * GET /api/officer/ai/findings
- * Returns AI meta for all recent issues.
- * Supports: client-officer's getFindings()
  */
 exports.officerGetAIFindings = asyncHandler(async (req, res) => {
   const issues = await Issue.find({
-    'aiMeta.summary': { $ne: null },
+    $or: [
+      { 'ai_analysis.summary': { $ne: null } },
+      { 'aiMeta.summary': { $ne: null } },
+    ],
     isDeleted: false,
   })
-    .select('title category aiMeta createdAt')
+    .select('title category priority ai_analysis aiMeta createdAt')
     .sort('-createdAt')
     .limit(20)
     .lean();
@@ -563,11 +725,13 @@ exports.officerGetAIFindings = asyncHandler(async (req, res) => {
   const findings = issues.map(i => ({
     _id:             i._id,
     issueId:         i._id,
-    category:        i.category,
-    severity:        i.priority || 'MEDIUM',
-    summary:         i.aiMeta?.summary,
-    confidence:      i.aiMeta?.confidence,
-    suggestedAction: i.aiMeta?.suggestedAction,
+    category:        i.ai_analysis?.category || i.category,
+    severity:        i.ai_analysis?.severity || i.priority || 'MEDIUM',
+    summary:         i.ai_analysis?.summary  || i.aiMeta?.summary,
+    confidence:      i.ai_analysis?.confidence ?? i.aiMeta?.confidence,
+    analysisTags:    i.ai_analysis?.analysisTags || i.aiMeta?.analysisTags || [],
+    reasoning:       i.ai_analysis?.reasoning || null,
+    departments:     i.ai_analysis?.departments || [],
     createdAt:       i.createdAt,
   }));
 
