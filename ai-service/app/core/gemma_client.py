@@ -74,6 +74,7 @@ class GemmaClientProtocol(Protocol):
         images: list[str] | None = None,  # base64-encoded images for vision
         temperature: float = 0.1,
         num_ctx: int = 8192,
+        tools: list[dict] | None = None,  # native function/tool definitions
     ) -> T:
         """
         Generate a structured JSON response validated against `response_schema`.
@@ -88,7 +89,12 @@ class GemmaClientProtocol(Protocol):
         num_ctx:         Context window size passed to Ollama.  Defaults to 8192.
                          Ollama silently caps Gemma 4 at 4096 if this is not set,
                          which truncates large prompts without raising an error.
-                         Override per-call: /analyze → 8192, /copilot → 16384.
+                         Override per-call: /analyze → 8192, /copilot → 8192.
+        tools:           Optional list of Ollama-format tool definitions for native
+                         function calling.  Ignored (no-op) on providers that do
+                         not support native tool calling (e.g. Google AI Studio
+                         fallback). Existing callers that omit this parameter are
+                         completely unaffected.
 
         Returns
         -------
@@ -120,7 +126,7 @@ class GemmaClientProtocol(Protocol):
 
 # ─── Production implementation ────────────────────────────────────────────────
 
-class GemmaClient:
+class OllamaGemmaClient:
     """
     Production implementation of GemmaClientProtocol backed by Ollama's
     /api/chat endpoint.
@@ -159,6 +165,7 @@ class GemmaClient:
         images: list[str] | None = None,
         temperature: float = 0.1,
         num_ctx: int = 8192,
+        tools: list[dict] | None = None,
     ) -> T:
         """
         Call Ollama /api/chat with `format: schema` to get a structured JSON
@@ -200,6 +207,9 @@ class GemmaClient:
             },
             "format": response_schema.model_json_schema(),
         }
+        # Attach native tool definitions if provided (Ollama native tool calling).
+        if tools:
+            payload["tools"] = tools
 
         log = logger.bind(
             model=self._settings.gemma_model,
@@ -452,3 +462,7 @@ class GemmaClient:
 
 # Internal alias used in warm_up's except clause to avoid a forward-ref import loop
 AIServiceErrorBase = (GemmaConnectionError, GemmaGenerationError, GemmaValidationError)
+
+# Backward-compatible alias — existing code that imports GemmaClient continues
+# to work without modification.  New code should use OllamaGemmaClient directly.
+GemmaClient = OllamaGemmaClient

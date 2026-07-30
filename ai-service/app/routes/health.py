@@ -15,10 +15,13 @@ from __future__ import annotations
 import structlog
 from fastapi import APIRouter, Request
 
+import json as _json
+
 from app.schemas.health import (
     FAISSCheck,
     FastAPICheck,
     GemmaCheck,
+    GemmaProviderStatus,
     HealthChecks,
     HealthResponse,
     OverallStatus,
@@ -54,26 +57,74 @@ async def health_check(request: Request) -> HealthResponse:
 
     # ── Gemma probe ────────────────────────────────────────────────────────────
     gemma_client = getattr(state, "gemma_client", None)
+
+    _unknown_primary = GemmaProviderStatus(
+        provider="ollama",
+        status="down",
+        model=getattr(state, "gemma_model_name", "unknown"),
+    )
+    _unknown_fallback = GemmaProviderStatus(
+        provider="google_ai_studio",
+        status="not_configured",
+    )
+
     if gemma_client is not None:
         try:
             gemma_status = await gemma_client.check_health()
+            # FailoverGemmaClient encodes dual-provider detail as JSON string
+            try:
+                detail_data = _json.loads(gemma_status.detail)
+                primary_data = detail_data.get("primary", {})
+                fallback_data = detail_data.get("fallback", {})
+                primary_check = GemmaProviderStatus(
+                    provider=primary_data.get("provider", "ollama"),
+                    status=primary_data.get("status", "down"),
+                    model=primary_data.get("model"),
+                    # These fields are present only for the relevant provider
+                    circuit_breaker=primary_data.get("circuit_breaker"),
+                    consecutive_failures=primary_data.get("consecutive_failures"),
+                    keys_total=primary_data.get("keys_total"),
+                    keys_available=primary_data.get("keys_available"),
+                )
+                fallback_check = GemmaProviderStatus(
+                    provider=fallback_data.get("provider", "google_ai_studio"),
+                    status=fallback_data.get("status", "not_configured"),
+                    model=fallback_data.get("model"),
+                    circuit_breaker=fallback_data.get("circuit_breaker"),
+                    consecutive_failures=fallback_data.get("consecutive_failures"),
+                    keys_total=fallback_data.get("keys_total"),
+                    keys_available=fallback_data.get("keys_available"),
+                )
+            except (_json.JSONDecodeError, AttributeError):
+                # Plain GemmaClient (not FailoverGemmaClient) — show minimal info
+                primary_check = GemmaProviderStatus(
+                    provider="ollama",
+                    status="up" if gemma_status.is_healthy else "down",
+                    model=gemma_status.model,
+                )
+                fallback_check = _unknown_fallback
+
             gemma_check = GemmaCheck(
                 status="up" if gemma_status.is_healthy else "down",
-                model=gemma_status.model,
-                detail=gemma_status.detail,
+                primary=primary_check,
+                fallback=fallback_check,
             )
         except Exception as exc:
             logger.warning("health.gemma_probe_exception", error=str(exc))
             gemma_check = GemmaCheck(
                 status="down",
-                model=getattr(state, "gemma_model_name", "unknown"),
-                detail=str(exc),
+                primary=_unknown_primary,
+                fallback=_unknown_fallback,
             )
     else:
         gemma_check = GemmaCheck(
             status="down",
-            model="not_initialised",
-            detail="GemmaClient not available on app.state",
+            primary=GemmaProviderStatus(
+                provider="ollama",
+                status="down",
+                model="not_initialised",
+            ),
+            fallback=_unknown_fallback,
         )
 
     # ── FAISS probe ────────────────────────────────────────────────────────────

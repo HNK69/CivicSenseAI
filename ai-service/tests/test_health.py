@@ -82,7 +82,8 @@ async def test_health_gemma_down(make_client, unhealthy_gemma_status, mock_faiss
     body = resp.json()
     assert body["status"] == OverallStatus.DEGRADED.value
     assert body["checks"]["gemma"]["status"] == "down"
-    assert "timed out" in body["checks"]["gemma"]["detail"]
+    # Dev mode: primary=google (not_configured), fallback=ollama (down)
+    assert body["checks"]["gemma"]["fallback"]["status"] == "down"
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -154,7 +155,8 @@ async def test_health_gemma_probe_exception(make_client, mock_faiss_manager_load
     body = resp.json()
     assert body["status"] == OverallStatus.DEGRADED.value
     assert body["checks"]["gemma"]["status"] == "down"
-    assert "connection refused" in body["checks"]["gemma"]["detail"]
+    # exception path: primary status should be down
+    assert body["checks"]["gemma"]["primary"]["status"] == "down"
 
 
 # ════════════════════════════════════════════════════════════════════════════════

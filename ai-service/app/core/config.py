@@ -73,6 +73,40 @@ class Settings(BaseSettings):
     faiss_persist_every_write: bool = Field(default=True)
     faiss_index_version: int = Field(default=1)
 
+    # ── Google AI Studio (fallback provider) ──────────────────────────────────
+    # Comma-separated API keys.  Empty string = fallback disabled (Ollama-only).
+    # Never logged or exposed through any endpoint.
+    google_ai_keys: str = Field(default="")
+    # Google AI Studio model name — must be a Gemma model to stay 100% Gemma.
+    google_ai_model: str = Field(default="gemma-4-12b-it")
+    # Per-call read timeout for Google AI Studio requests.
+    google_ai_timeout_seconds: int = Field(default=120)
+    # How long (seconds) a rate-limited key sits in cooldown before retry.
+    key_cooldown_seconds: float = Field(default=60.0)
+
+    # ── Circuit breaker (guards Ollama) ───────────────────────────────────────
+    # Number of consecutive Ollama failures before circuit opens.
+    circuit_breaker_failure_threshold: int = Field(default=3)
+    # Seconds the circuit stays open before transitioning to half-open.
+    circuit_breaker_reset_timeout: float = Field(default=60.0)
+
+    # ── Failover budget ────────────────────────────────────────────────────────
+    # Wall-clock budget (seconds) for the entire failover chain per request.
+    # Includes Ollama attempt + every Google key attempt.
+    failover_budget_seconds: float = Field(default=120.0)
+
+    # ── /verify-repair ────────────────────────────────────────────────────────
+    verify_repair_num_ctx: int = Field(default=8192)
+    verify_repair_max_images: int = Field(default=4)
+    # Max dimension (px) images are resized to before diff and Gemma Vision.
+    max_image_dimension: int = Field(default=1024)
+    # Timeout (seconds) for downloading images from Cloudinary/external URLs.
+    media_download_timeout_seconds: int = Field(default=30)
+
+    # ── /copilot ──────────────────────────────────────────────────────────────
+    copilot_num_ctx: int = Field(default=8192)
+    copilot_max_tool_iterations: int = Field(default=3)
+
     # ── Derived properties ────────────────────────────────────────────────────
     @property
     def ollama_base_url(self) -> str:
@@ -81,6 +115,13 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.environment.lower() == "development"
+
+    @property
+    def google_ai_keys_list(self) -> list[str]:
+        """Parse GOOGLE_AI_KEYS into a list of non-empty stripped strings."""
+        if not self.google_ai_keys.strip():
+            return []
+        return [k.strip() for k in self.google_ai_keys.split(",") if k.strip()]
 
     @field_validator("log_level")
     @classmethod

@@ -34,12 +34,30 @@ from app.main import create_app
 
 # ─── Mock GemmaClient ──────────────────────────────────────────────────────────
 
+import json as _json
+
+
 @pytest.fixture
 def healthy_gemma_status() -> GemmaHealthStatus:
     return GemmaHealthStatus(
         is_healthy=True,
-        model="gemma4:12b",
-        detail="Model available",
+        model="gemma-4-12b-it",
+        detail=_json.dumps({
+            "primary": {
+                "provider": "google_ai_studio",
+                "status": "available",
+                "model": "gemma-4-12b-it",
+                "keys_total": 0,
+                "keys_available": 0,
+            },
+            "fallback": {
+                "provider": "ollama",
+                "status": "up",
+                "model": "gemma4:12b",
+                "circuit_breaker": "closed",
+                "consecutive_failures": 0,
+            },
+        }),
     )
 
 
@@ -47,8 +65,23 @@ def healthy_gemma_status() -> GemmaHealthStatus:
 def unhealthy_gemma_status() -> GemmaHealthStatus:
     return GemmaHealthStatus(
         is_healthy=False,
-        model="gemma4:12b",
-        detail="Ollama probe timed out",
+        model="gemma-4-12b-it",
+        detail=_json.dumps({
+            "primary": {
+                "provider": "google_ai_studio",
+                "status": "not_configured",
+                "model": None,
+                "keys_total": 0,
+                "keys_available": 0,
+            },
+            "fallback": {
+                "provider": "ollama",
+                "status": "down",
+                "model": "gemma4:12b",
+                "circuit_breaker": "closed",
+                "consecutive_failures": 1,
+            },
+        }),
     )
 
 
@@ -99,7 +132,7 @@ def _build_test_app(
     # Patch GemmaClient and FAISSIndexManager so the lifespan doesn't try to
     # connect to real services.
     with (
-        patch("app.main.GemmaClient") as MockGemmaClient,
+        patch("app.main.FailoverGemmaClient") as MockGemmaClient,
         patch("app.main.FAISSIndexManager") as MockFAISSManager,
     ):
         MockGemmaClient.return_value = gemma_client or AsyncMock()

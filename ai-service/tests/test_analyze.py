@@ -70,7 +70,8 @@ def valid_gemma_output() -> GemmaAnalysisOutput:
     return GemmaAnalysisOutput(
         category=ComplaintCategory.ROAD,
         severity=Severity.HIGH,
-        department=Department.ROADS_AND_TRANSPORT,
+        primary_department=Department.ROADS_AND_TRANSPORT,
+        departments=[Department.ROADS_AND_TRANSPORT],
         priority=Priority.P2,
         summary="Large pothole on arterial road causing vehicle damage risk.",
         confidence=0.91,
@@ -128,8 +129,19 @@ def request_with_images(gps: GPSCoordinates) -> AnalyzeRequest:
 
 @pytest.fixture
 def request_with_video(gps: GPSCoordinates) -> AnalyzeRequest:
+    """Uses the new video_urls (list) field — the primary API going forward."""
     return AnalyzeRequest(
         text="Pothole captured on video",
+        video_urls=["http://res.cloudinary.com/test/video/upload/clip.mp4"],
+        gps=gps,
+    )
+
+
+@pytest.fixture
+def request_with_video_legacy(gps: GPSCoordinates) -> AnalyzeRequest:
+    """Uses the legacy singular video_url field — must still work via merge."""
+    return AnalyzeRequest(
+        text="Pothole captured on video (legacy)",
         video_url="http://res.cloudinary.com/test/video/upload/clip.mp4",
         gps=gps,
     )
@@ -414,14 +426,15 @@ def test_prompt_builder_gps_in_user_prompt(gps: GPSCoordinates):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_department_enum_invalid_value_rejected():
-    """GemmaAnalysisOutput must reject a department not in the Department enum."""
+    """GemmaAnalysisOutput must reject a primary_department not in the Department enum."""
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError) as exc_info:
         GemmaAnalysisOutput(
             category="ROAD",
             severity="HIGH",
-            department="FREE_TEXT_DEPT",   # not in Department enum
+            primary_department="FREE_TEXT_DEPT",   # not in Department enum
+            departments=["FREE_TEXT_DEPT"],
             priority="P2",
             summary="A valid summary that is long enough.",
             confidence=0.9,
@@ -429,7 +442,7 @@ def test_department_enum_invalid_value_rejected():
             reasoning="Reasoning text that is long enough for the validator.",
         )
     errors = exc_info.value.errors()
-    assert any(e["loc"] == ("department",) for e in errors)
+    assert any(e["loc"] == ("primary_department",) for e in errors)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -442,14 +455,15 @@ def test_department_enum_all_valid_values_pass(dept: Department):
     output = GemmaAnalysisOutput(
         category="ROAD",
         severity="LOW",
-        department=dept.value,
+        primary_department=dept.value,
+        departments=[dept.value],
         priority="P4",
         summary="A valid summary that is long enough to pass.",
         confidence=0.5,
         analysisTags=["tag"],
         reasoning="Reasoning text that is long enough for the validator here.",
     )
-    assert output.department == dept
+    assert output.primary_department == dept
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -463,7 +477,8 @@ def test_category_enum_invalid_value_rejected():
         GemmaAnalysisOutput(
             category="FLYING_SAUCER",
             severity="HIGH",
-            department="PUBLIC_WORKS",
+            primary_department="PUBLIC_WORKS",
+            departments=["PUBLIC_WORKS"],
             priority="P2",
             summary="Summary text long enough.",
             confidence=0.8,
@@ -679,11 +694,13 @@ def test_system_prompt_contains_all_departments():
 def test_analysis_response_has_all_required_fields(
     valid_gemma_output: GemmaAnalysisOutput,
 ):
-    """AnalysisResponse must expose all 8 Gemma output fields + 2 media fields."""
+    """AnalysisResponse must expose all Gemma output fields + media fields."""
     resp = AnalysisResponse(
         category=valid_gemma_output.category,
         severity=valid_gemma_output.severity,
-        department=valid_gemma_output.department,
+        primary_department=valid_gemma_output.primary_department,
+        departments=valid_gemma_output.departments,
+        department=valid_gemma_output.primary_department,
         priority=valid_gemma_output.priority,
         summary=valid_gemma_output.summary,
         confidence=valid_gemma_output.confidence,
@@ -693,9 +710,317 @@ def test_analysis_response_has_all_required_fields(
         media_failed=[MediaFailure(url="http://x.com/img.jpg", reason="404")],
     )
     required = {
-        "category", "severity", "department", "priority",
-        "summary", "confidence", "analysisTags", "reasoning",
+        "category", "severity", "primary_department", "departments",
+        "department",  # backward-compat alias
+        "priority", "summary", "confidence", "analysisTags", "reasoning",
         "media_processed", "media_failed",
     }
     for field in required:
         assert hasattr(resp, field), f"Missing field: {field}"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 24–29. Multi-department routing tests
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _make_gemma_output(
+    primary: Department,
+    departments: list[Department],
+    category: ComplaintCategory = ComplaintCategory.ROAD,
+    severity: Severity = Severity.MEDIUM,
+    summary: str = "Test complaint with multiple issues.",
+    reasoning: str = "Primary issue identified first. Secondary issues noted.",
+) -> GemmaAnalysisOutput:
+    """Helper: build a GemmaAnalysisOutput with explicit multi-department routing."""
+    return GemmaAnalysisOutput(
+        category=category,
+        severity=severity,
+        primary_department=primary,
+        departments=departments,
+        priority=Priority.P3,
+        summary=summary,
+        confidence=0.85,
+        analysisTags=["multi-issue"],
+        reasoning=reasoning,
+    )
+
+
+# 24. Single issue → one department
+def test_single_issue_single_department():
+    """A single-issue complaint results in exactly one department."""
+    output = _make_gemma_output(
+        primary=Department.ROADS_AND_TRANSPORT,
+        departments=[Department.ROADS_AND_TRANSPORT],
+    )
+    assert output.primary_department == Department.ROADS_AND_TRANSPORT
+    assert output.departments == [Department.ROADS_AND_TRANSPORT]
+    assert len(output.departments) == 1
+
+
+# 25. Pothole + garbage → Roads + Sanitation
+@pytest.mark.asyncio
+async def test_pothole_and_garbage_two_departments():
+    """Pothole + garbage complaint routes to ROADS_AND_TRANSPORT + SANITATION."""
+    gps = GPSCoordinates(lat=12.97, lng=77.59)
+    request = AnalyzeRequest(
+        text="There is a large pothole on the road. Garbage has accumulated beside it.",
+        gps=gps,
+    )
+
+    gemma_output = _make_gemma_output(
+        primary=Department.ROADS_AND_TRANSPORT,
+        departments=[Department.ROADS_AND_TRANSPORT, Department.SANITATION],
+        category=ComplaintCategory.ROAD,
+        severity=Severity.HIGH,
+        summary="Pothole on road; garbage accumulated nearby. Two departments notified.",
+        reasoning=(
+            "Pothole is the primary issue: ROADS_AND_TRANSPORT. "
+            "Garbage accumulation is secondary: SANITATION."
+        ),
+    )
+
+    gemma = AsyncMock(spec=GemmaClientProtocol)
+    gemma.generate_structured = AsyncMock(return_value=gemma_output)
+
+    result = await analyze_complaint(request=request, gemma=gemma)
+
+    assert result.primary_department == Department.ROADS_AND_TRANSPORT
+    assert Department.ROADS_AND_TRANSPORT in result.departments
+    assert Department.SANITATION in result.departments
+    assert len(result.departments) == 2
+    # Backward-compat alias
+    assert result.department == Department.ROADS_AND_TRANSPORT
+
+
+# 26. Garbage + blocked drain → Sanitation + Public Works
+@pytest.mark.asyncio
+async def test_garbage_and_blocked_drain_two_departments():
+    """Garbage + blocked drain routes to SANITATION + PUBLIC_WORKS."""
+    gps = GPSCoordinates(lat=12.97, lng=77.59)
+    request = AnalyzeRequest(
+        text="Garbage has accumulated beside a blocked drain causing stagnant water.",
+        gps=gps,
+    )
+
+    gemma_output = _make_gemma_output(
+        primary=Department.SANITATION,
+        departments=[Department.SANITATION, Department.PUBLIC_WORKS],
+        category=ComplaintCategory.WASTE,
+        severity=Severity.HIGH,
+        summary="Garbage pile and blocked drain. SANITATION primary; PUBLIC_WORKS for drain.",
+        reasoning=(
+            "Garbage is the primary issue: SANITATION. "
+            "Blocked drain is secondary: PUBLIC_WORKS."
+        ),
+    )
+
+    gemma = AsyncMock(spec=GemmaClientProtocol)
+    gemma.generate_structured = AsyncMock(return_value=gemma_output)
+
+    result = await analyze_complaint(request=request, gemma=gemma)
+
+    assert result.primary_department == Department.SANITATION
+    assert Department.SANITATION in result.departments
+    assert Department.PUBLIC_WORKS in result.departments
+    assert len(result.departments) == 2
+
+
+# 27. Water leak + broken streetlight → Water Authority + Electricity
+@pytest.mark.asyncio
+async def test_water_leak_and_streetlight_two_departments():
+    """Water pipe leak + broken streetlight routes to WATER_AUTHORITY + ELECTRICITY."""
+    gps = GPSCoordinates(lat=12.97, lng=77.59)
+    request = AnalyzeRequest(
+        text="A water pipe is leaking near a broken streetlight.",
+        gps=gps,
+    )
+
+    gemma_output = _make_gemma_output(
+        primary=Department.WATER_AUTHORITY,
+        departments=[Department.WATER_AUTHORITY, Department.ELECTRICITY],
+        category=ComplaintCategory.WATER,
+        severity=Severity.HIGH,
+        summary="Water pipe leak and broken streetlight. Two separate departments required.",
+        reasoning=(
+            "Water leak is the primary issue (public health risk): WATER_AUTHORITY. "
+            "Broken streetlight is secondary: ELECTRICITY."
+        ),
+    )
+
+    gemma = AsyncMock(spec=GemmaClientProtocol)
+    gemma.generate_structured = AsyncMock(return_value=gemma_output)
+
+    result = await analyze_complaint(request=request, gemma=gemma)
+
+    assert result.primary_department == Department.WATER_AUTHORITY
+    assert Department.WATER_AUTHORITY in result.departments
+    assert Department.ELECTRICITY in result.departments
+    assert len(result.departments) == 2
+
+
+# 28. Duplicate departments are deduplicated
+def test_duplicate_departments_deduplicated():
+    """
+    If Gemma returns duplicate departments (two potholes → both ROADS_AND_TRANSPORT),
+    the model_validator deduplicates the list.
+    """
+    # Supply the same department twice — should be deduplicated
+    output = GemmaAnalysisOutput(
+        category=ComplaintCategory.ROAD,
+        severity=Severity.MEDIUM,
+        primary_department=Department.ROADS_AND_TRANSPORT,
+        departments=[
+            Department.ROADS_AND_TRANSPORT,
+            Department.ROADS_AND_TRANSPORT,  # duplicate
+            Department.ROADS_AND_TRANSPORT,  # duplicate
+        ],
+        priority=Priority.P3,
+        summary="Multiple potholes on the same road segment.",
+        confidence=0.88,
+        analysisTags=["pothole", "road"],
+        reasoning="Two potholes, same department, deduplication expected.",
+    )
+    assert output.departments.count(Department.ROADS_AND_TRANSPORT) == 1
+    assert len(output.departments) == 1
+
+
+# 29. primary_department always present in departments
+def test_primary_department_always_in_departments():
+    """
+    Even if Gemma forgets to include primary_department in the departments list,
+    the model_validator inserts it automatically.
+    """
+    # primary_department is NOT in departments — validator must insert it
+    output = GemmaAnalysisOutput(
+        category=ComplaintCategory.WASTE,
+        severity=Severity.LOW,
+        primary_department=Department.SANITATION,
+        departments=[Department.PUBLIC_WORKS],  # primary missing!
+        priority=Priority.P4,
+        summary="Garbage near drain.",
+        confidence=0.7,
+        analysisTags=["garbage"],
+        reasoning="Garbage is primary. Drain is secondary. Validator should add primary.",
+    )
+    assert Department.SANITATION in output.departments
+    assert output.departments[0] == Department.SANITATION  # prepended at front
+
+
+# 30. Backward-compat: department alias equals primary_department
+def test_department_alias_equals_primary_department():
+    """
+    AnalysisResponse.department must equal primary_department.
+    Existing Node clients reading `department` continue to work unchanged.
+    """
+    resp = AnalysisResponse(
+        category=ComplaintCategory.ROAD,
+        severity=Severity.HIGH,
+        primary_department=Department.ROADS_AND_TRANSPORT,
+        departments=[Department.ROADS_AND_TRANSPORT, Department.SANITATION],
+        department=Department.ROADS_AND_TRANSPORT,
+        priority=Priority.P2,
+        summary="Pothole and garbage on main road.",
+        confidence=0.9,
+        analysisTags=["pothole", "garbage"],
+        reasoning="Primary is ROADS_AND_TRANSPORT for pothole. SANITATION for garbage.",
+        media_processed=0,
+    )
+    # Alias must always mirror primary_department
+    assert resp.department == resp.primary_department
+    assert resp.department == Department.ROADS_AND_TRANSPORT
+    # departments contains both
+    assert Department.ROADS_AND_TRANSPORT in resp.departments
+    assert Department.SANITATION in resp.departments
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 31–34. video_urls (plural list) pipeline tests
+# ══════════════════════════════════════════════════════════════════════════════
+
+# 31. video_urls list field is parsed and merged correctly
+def test_analyze_request_accepts_video_urls_list(gps: GPSCoordinates):
+    """AnalyzeRequest must accept video_urls as a list without error."""
+    req = AnalyzeRequest(
+        text="Pothole on road",
+        video_urls=[
+            "http://example.com/clip1.mp4",
+            "http://example.com/clip2.mp4",
+        ],
+        gps=gps,
+    )
+    assert len(req.video_urls) == 2
+    assert str(req.video_urls[0]) == "http://example.com/clip1.mp4"
+    assert str(req.video_urls[1]) == "http://example.com/clip2.mp4"
+
+
+# 32. Legacy video_url (singular) is merged into video_urls
+def test_analyze_request_legacy_video_url_merged(gps: GPSCoordinates):
+    """Legacy singular video_url must be merged into video_urls automatically."""
+    req = AnalyzeRequest(
+        text="Pothole on road",
+        video_url="http://example.com/legacy.mp4",
+        gps=gps,
+    )
+    assert any("legacy.mp4" in str(u) for u in req.video_urls), (
+        "Legacy video_url must appear in video_urls after merge"
+    )
+
+
+# 33. video_url and video_urls together — no duplicates
+def test_analyze_request_no_duplicate_on_merge(gps: GPSCoordinates):
+    """If video_url is already in video_urls, it must not be duplicated."""
+    url = "http://example.com/clip.mp4"
+    req = AnalyzeRequest(
+        text="Test",
+        video_url=url,
+        video_urls=[url],
+        gps=gps,
+    )
+    url_strs = [str(u) for u in req.video_urls]
+    assert url_strs.count(url) == 1, "URL must not appear twice after merge"
+
+
+# 34. video_urls pipeline: frames extracted and passed to Gemma
+@pytest.mark.asyncio
+async def test_analyze_video_urls_frames_sent_to_gemma(
+    mock_gemma: AsyncMock,
+    dummy_b64: str,
+    tmp_path: Path,
+    gps: GPSCoordinates,
+):
+    """
+    When video_urls contains a URL, the service must download it, extract
+    keyframes via OpenCV, and pass those frames to Gemma.
+    """
+    fake_tmp = tmp_path / "video.mp4"
+    fake_tmp.write_bytes(b"fake-video-data")
+
+    async def _fake_video(url, client, settings=None):
+        return fake_tmp
+
+    fake_frames = [dummy_b64, dummy_b64]  # 2 frames
+
+    def _fake_extract(path, max_frames=4, max_dimension=1024):
+        return fake_frames
+
+    request = AnalyzeRequest(
+        text="Pothole captured on video",
+        video_urls=["http://res.cloudinary.com/test/video/upload/clip.mp4"],
+        gps=gps,
+    )
+
+    result = await analyze_complaint(
+        request=request,
+        gemma=mock_gemma,
+        _fetch_video_fn=_fake_video,
+        _extract_frames_fn=_fake_extract,
+    )
+
+    assert result.media_processed == 2, (
+        f"Expected 2 frames processed, got {result.media_processed}"
+    )
+    assert result.media_failed == []
+    call_kwargs = mock_gemma.generate_structured.call_args.kwargs
+    assert call_kwargs["images"] == fake_frames, (
+        "Extracted frames must be forwarded to Gemma"
+    )

@@ -13,7 +13,10 @@ Hierarchy:
     ├── GemmaGenerationError      — Ollama returned a non-2xx or empty body
     ├── GemmaValidationError      — Gemma output failed Pydantic schema validation
     ├── FAISSError                 — index load/search failure
-    └── MediaFetchError           — failed to download Cloudinary asset
+    ├── MediaFetchError           — failed to download Cloudinary asset
+    ├── EmbeddingError            — bge-m3 embedding generation failure
+    ├── RateLimitError            — provider rate limit hit (internal, triggers key rotation)
+    └── ProviderUnavailableError  — all providers exhausted / failover budget exceeded
 """
 from __future__ import annotations
 
@@ -87,3 +90,26 @@ class EmbeddingError(AIServiceError):
     """Raised when bge-m3 embedding generation via Ollama /api/embed fails."""
 
     status_code = HTTPStatus.BAD_GATEWAY.value
+
+
+class RateLimitError(AIServiceError):
+    """
+    Raised internally by GoogleAIStudioGemmaClient when a request is rejected
+    with HTTP 429 / ResourceExhausted.  Caught by FailoverGemmaClient to
+    trigger APIKeyManager rotation.  Never surfaces to external callers.
+    """
+
+    status_code = HTTPStatus.TOO_MANY_REQUESTS.value
+
+
+class ProviderUnavailableError(AIServiceError):
+    """
+    Raised by FailoverGemmaClient when:
+    - All Google AI Studio API keys are exhausted/rate-limited, OR
+    - The failover wall-clock budget has been exceeded.
+
+    Signals to callers that no Gemma provider is currently able to serve
+    the request.
+    """
+
+    status_code = HTTPStatus.SERVICE_UNAVAILABLE.value

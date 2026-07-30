@@ -75,6 +75,12 @@ async def analyze_complaint(
     images_b64: list[str] = []
     media_failed: list[MediaFailure] = []
 
+    logger.info(
+        "analyze.request.received",
+        image_url_count=len(request.image_urls),
+        video_url_count=len(request.video_urls),
+    )
+
     # ── 1. Download images concurrently ──────────────────────────────────────
     if request.image_urls:
         # Single shared client for all image downloads
@@ -109,11 +115,20 @@ async def analyze_complaint(
             else:
                 images_b64.append(result)
 
-    # ── 2. Extract video keyframes ────────────────────────────────────────────
-    if request.video_url:
-        video_url_str = str(request.video_url)
+    # Track which images came from image_urls (for has_original_images flag)
+    image_only_count = len(images_b64)
+
+    # ── 2. Extract video keyframes (one per video URL) ────────────────────────
+    failed_video_urls: set[str] = set()
+
+    for video_url in request.video_urls:
+        video_url_str = str(video_url)
         tmp_path: Path | None = None
         try:
+            logger.info(
+                "analyze.video.downloading",
+                url=video_url_str,
+            )
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(
                     connect=10.0,
@@ -124,22 +139,34 @@ async def analyze_complaint(
             ) as vid_client:
                 tmp_path = await fetch_video(video_url_str, vid_client, cfg)
 
+            logger.info(
+                "analyze.video.download_successful",
+                url=video_url_str,
+                tmp_path=str(tmp_path),
+            )
+
             # Run OpenCV synchronously in a thread pool to avoid blocking
             # the async event loop (cv2.VideoCapture has no async API).
+            logger.info(
+                "analyze.video.extracting_keyframes",
+                url=video_url_str,
+                max_frames=cfg.analyze_max_frames,
+            )
             loop = asyncio.get_running_loop()
             frames = await loop.run_in_executor(
                 None,
-                lambda: extract_frames(
-                    tmp_path,
+                lambda p=tmp_path: extract_frames(
+                    p,
                     cfg.analyze_max_frames,
                     cfg.max_image_dimension,
                 ),
             )
             images_b64.extend(frames)
-            logger.debug(
-                "analyze.video_frames_extracted",
+            logger.info(
+                "analyze.video.frames_extracted",
                 url=video_url_str,
-                frames=len(frames),
+                frames_extracted=len(frames),
+                total_media_so_far=len(images_b64),
             )
 
         except MediaFetchError as exc:
@@ -151,6 +178,7 @@ async def analyze_complaint(
             media_failed.append(
                 MediaFailure(url=video_url_str, reason=exc.message)
             )
+            failed_video_urls.add(video_url_str)
         except Exception as exc:
             logger.warning(
                 "analyze.video_skipped",
@@ -160,27 +188,23 @@ async def analyze_complaint(
             media_failed.append(
                 MediaFailure(url=video_url_str, reason=str(exc))
             )
+            failed_video_urls.add(video_url_str)
         finally:
             if tmp_path is not None:
                 tmp_path.unlink(missing_ok=True)
 
     # ── 3. Build prompt ───────────────────────────────────────────────────────
-    has_images = bool(images_b64) and not bool(
-        request.video_url
-        and not request.image_urls
-        and not images_b64
+    has_original_images = image_only_count > 0
+    has_video_frames = any(
+        str(u) not in failed_video_urls for u in request.video_urls
     )
-    has_frames = bool(request.video_url) and bool(images_b64)
 
-    # Simpler: any images from image_urls that succeeded
-    image_url_successes = len(images_b64) - (
-        len(images_b64) - len([u for u in request.image_urls
-                                if str(u) not in {f.url for f in media_failed}])
-    )
-    has_original_images = image_url_successes > 0
-    has_video_frames = (
-        request.video_url is not None
-        and str(request.video_url) not in {f.url for f in media_failed}
+    logger.info(
+        "analyze.media.summary",
+        has_original_images=has_original_images,
+        has_video_frames=has_video_frames,
+        media_count=len(images_b64),
+        media_failed_count=len(media_failed),
     )
 
     system_prompt, user_prompt = build_analyze_prompts(
@@ -208,7 +232,9 @@ async def analyze_complaint(
     return AnalysisResponse(
         category=gemma_output.category,
         severity=gemma_output.severity,
-        department=gemma_output.department,
+        primary_department=gemma_output.primary_department,
+        departments=gemma_output.departments,
+        department=gemma_output.primary_department,  # alias — also synced by model_validator
         priority=gemma_output.priority,
         summary=gemma_output.summary,
         confidence=gemma_output.confidence,

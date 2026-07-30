@@ -30,11 +30,25 @@ class FastAPICheck(BaseModel, frozen=True):
     status: Literal["up"] = "up"
 
 
-class GemmaCheck(BaseModel, frozen=True):
-    status: Literal["up", "down"]
-    model: str
-    detail: str = ""
+class GemmaProviderStatus(BaseModel, frozen=True):
+    """Status of a single Gemma provider (Ollama or Google AI Studio)."""
+    provider: str
+    status: str                   # "up" | "down" | "available" | "not_configured"
+    model: str | None = None
+    circuit_breaker: str | None = None     # "closed" | "open" | "half-open"
+    consecutive_failures: int | None = None
+    keys_total: int | None = None
+    keys_available: int | None = None
 
+
+class GemmaCheck(BaseModel, frozen=True):
+    """
+    Dual-provider Gemma health check.
+    Both providers' statuses are reported without exposing API key values.
+    """
+    status: Literal["up", "down"]
+    primary: GemmaProviderStatus
+    fallback: GemmaProviderStatus
 
 class FAISSCheck(BaseModel, frozen=True):
     status: Literal["loaded", "not_loaded"]

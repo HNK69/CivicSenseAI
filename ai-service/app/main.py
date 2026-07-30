@@ -32,7 +32,7 @@ from fastapi.routing import APIRouter
 from app.core.config import get_settings
 from app.core.exceptions import AIServiceError
 from app.core.embedding_client import EmbeddingClient
-from app.core.gemma_client import GemmaClient
+from app.core.failover_client import FailoverGemmaClient
 from app.core.logging import setup_logging
 from app.core.middleware import CorrelationIDMiddleware
 from app.faiss.index_manager import FAISSIndexManager
@@ -40,6 +40,8 @@ from app.faiss.metadata_store import MetadataStore
 from app.routes.health import router as health_router
 from app.routes.analyze import router as analyze_router
 from app.routes.duplicates import router as duplicates_router
+from app.routes.verify_repair import router as verify_repair_router
+from app.routes.copilot import router as copilot_router
 
 # ── Logging must be configured before the first log line ─────────────────────
 setup_logging()
@@ -75,8 +77,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         ollama_url=settings.ollama_base_url,
     )
 
-    # ── 1. GemmaClient ────────────────────────────────────────────────────────
-    gemma_client = GemmaClient(settings=settings)
+    # Store settings on app.state for route-level access
+    app.state.settings = settings
+
+    # ── 1. FailoverGemmaClient (Ollama primary + Google AI Studio fallback) ──
+    gemma_client = FailoverGemmaClient(settings=settings)
     app.state.gemma_client = gemma_client
     app.state.gemma_model_name = settings.gemma_model
 
@@ -202,9 +207,8 @@ def create_app() -> FastAPI:
     api_router.include_router(health_router)
     api_router.include_router(analyze_router)
     api_router.include_router(duplicates_router)
-    # Future modules attach here:
-    # api_router.include_router(verify_repair_router)
-    # api_router.include_router(copilot_router)
+    api_router.include_router(verify_repair_router)
+    api_router.include_router(copilot_router)
 
     app.include_router(api_router)
 

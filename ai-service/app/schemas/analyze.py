@@ -19,7 +19,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 
 # ─── Domain enumerations ──────────────────────────────────────────────────────
@@ -77,9 +77,18 @@ class AnalyzeRequest(BaseModel):
     Body of POST /api/v1/analyze.
     Node sends this after uploading media to Cloudinary.
     The AI service downloads media only when required.
+
+    Video fields
+    ─────────────
+    video_urls  — preferred: a list of video URLs (one or more).
+    video_url   — legacy: a single video URL.  Accepted for backward compat.
+    Both fields are normalised into video_urls by the model_validator.
     """
     text: Annotated[str, Field(min_length=1, max_length=4000)]
     image_urls: list[HttpUrl] = Field(default_factory=list)
+    # Plural list — primary API going forward
+    video_urls: list[HttpUrl] = Field(default_factory=list)
+    # Singular legacy field — still accepted, merged into video_urls
     video_url: HttpUrl | None = None
     gps: GPSCoordinates
 
@@ -89,6 +98,18 @@ class AnalyzeRequest(BaseModel):
         if len(v) > 10:
             raise ValueError("A maximum of 10 image URLs may be submitted per complaint.")
         return v
+
+    @model_validator(mode="after")
+    def _merge_video_fields(self) -> "AnalyzeRequest":
+        """
+        Merge the singular `video_url` into `video_urls` so the rest of the
+        pipeline only has to iterate over `video_urls`.
+        """
+        if self.video_url is not None:
+            existing = {str(u) for u in self.video_urls}
+            if str(self.video_url) not in existing:
+                self.video_urls = list(self.video_urls) + [self.video_url]
+        return self
 
 
 # ─── Gemma output schema ──────────────────────────────────────────────────────
@@ -102,15 +123,44 @@ class GemmaAnalysisOutput(BaseModel):
     All Enum fields mean Gemma cannot hallucinate an unknown department or
     severity — Ollama's structured-output sampler rejects any token not in
     the JSON schema's enum list.
+
+    Multi-department routing:
+      primary_department — the single most urgent department (replaces old `department`).
+      departments        — ALL departments that should receive a work order,
+                           including primary_department.
     """
-    category:     ComplaintCategory
-    severity:     Severity
-    department:   Department
+    category:           ComplaintCategory
+    severity:           Severity
+    primary_department: Department
+    departments:        Annotated[
+        list[Department],
+        Field(
+            min_length=1,
+            description="All departments that should receive a work order. "
+                         "Must include primary_department. Must be unique.",
+        ),
+    ]
     priority:     Priority
     summary:      Annotated[str, Field(min_length=10, max_length=500)]
     confidence:   Annotated[float, Field(ge=0.0, le=1.0)]
     analysisTags: Annotated[list[str], Field(min_length=1, max_length=10)]
     reasoning:    Annotated[str, Field(min_length=20)]
+
+    @model_validator(mode="after")
+    def _validate_multi_department(self) -> "GemmaAnalysisOutput":
+        # Deduplicate while preserving order
+        seen: set[Department] = set()
+        unique: list[Department] = []
+        for d in self.departments:
+            if d not in seen:
+                seen.add(d)
+                unique.append(d)
+        self.departments = unique
+
+        # primary_department must appear in departments
+        if self.primary_department not in seen:
+            self.departments = [self.primary_department] + self.departments
+        return self
 
 
 # ─── Response ─────────────────────────────────────────────────────────────────
@@ -131,16 +181,29 @@ class AnalysisResponse(BaseModel):
     Gemma output fields (category…reasoning) are carried verbatim.
     media_processed / media_failed provide transparency about what
     the AI actually saw — broken CDN URLs are never silently swallowed.
+
+    Multi-department routing:
+      primary_department — most urgent department; always present in departments.
+      departments        — every department that should receive a work order.
+      department         — backward-compatible alias for primary_department.
     """
     # ── Gemma reasoning output ────────────────────────────────────────────────
-    category:     ComplaintCategory
-    severity:     Severity
-    department:   Department
-    priority:     Priority
-    summary:      str
-    confidence:   float
-    analysisTags: list[str]
-    reasoning:    str
+    category:           ComplaintCategory
+    severity:           Severity
+    primary_department: Department
+    departments:        list[Department]
+    priority:           Priority
+    summary:            str
+    confidence:         float
+    analysisTags:       list[str]
+    reasoning:          str
+
+    # ── Backward-compatible alias ─────────────────────────────────────────────
+    # Clients that read only `department` continue to work unchanged.
+    # New clients should prefer `primary_department`.
+    department: Department = Field(
+        description="Backward-compatible alias for primary_department.",
+    )
 
     # ── Service-level media metadata ──────────────────────────────────────────
     media_processed: int = Field(
@@ -151,3 +214,9 @@ class AnalysisResponse(BaseModel):
         default_factory=list,
         description="Media items that could not be fetched. Analysis proceeded without them.",
     )
+
+    @model_validator(mode="after")
+    def _sync_department_alias(self) -> "AnalysisResponse":
+        """Keep department alias in sync with primary_department."""
+        self.department = self.primary_department
+        return self
