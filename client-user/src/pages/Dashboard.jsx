@@ -74,24 +74,26 @@ const Dashboard = () => {
               {issuesLoading ? (
                 <div className="text-center py-2"><Spinner animation="border" size="sm" /></div>
               ) : (
-                <div>
+                <div style={{ minWidth: 0 }}>
                   {recentIssues.map(issue => (
-                    <div key={issue.id} className="report-item">
+                    <div key={issue.id || issue._id} className="report-item" style={{ minWidth: 0 }}>
                       <div
-                        className="report-icon"
+                        className="report-icon flex-shrink-0"
                         style={{ background: '#f1f5f9', color: '#64748b' }}
                       >
-                        <i className={`bi ${categoryIconMap[issue.category] ?? 'bi-three-dots'}`} />
+                        <i className={`bi ${categoryIconMap[issue.category?.toLowerCase()] ?? 'bi-three-dots'}`} />
                       </div>
-                      <div className="flex-grow-1 min-w-0">
-                        <div className="fw-semibold text-truncate" style={{ fontSize: '.85rem' }}>
+                      <div className="flex-grow-1 min-w-0" style={{ minWidth: 0, overflow: 'hidden' }}>
+                        <div className="fw-semibold text-truncate" style={{ fontSize: '.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {issue.title}
                         </div>
                         <div className="text-muted" style={{ fontSize: '.72rem' }}>
                           {timeAgo(issue.createdAt)}
                         </div>
                       </div>
-                      <StatusBadge status={issue.status} size="sm" />
+                      <div style={{ flexShrink: 0 }}>
+                        <StatusBadge status={issue.status} size="sm" />
+                      </div>
                     </div>
                   ))}
                 </div>

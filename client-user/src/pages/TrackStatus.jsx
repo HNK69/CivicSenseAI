@@ -48,8 +48,8 @@ const TrackStatus = () => {
 
   return (
     <>
-      {/* Hero */}
-      <div className="page-hero" style={{ paddingTop: 'calc(64px + 2rem)' }}>
+      {/* Sticky Hero Header */}
+      <div className="page-hero">
         <Container>
           <BackButton fallback="/dashboard" />
           <h1 className="mb-1">

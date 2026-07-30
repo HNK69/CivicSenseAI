@@ -23,6 +23,9 @@ const ReportIssue = () => {
       const res = await reportIssue(formData);
       setIssueId(res.issueId);
       setSuccess(true);
+      setTimeout(() => {
+        navigate('/status');
+      }, 2200);
     } catch (err) {
       setError(err?.response?.data?.message || 'Submission failed. Please try again.');
     } finally {
@@ -32,8 +35,8 @@ const ReportIssue = () => {
 
   return (
     <>
-      {/* Hero */}
-      <div className="page-hero" style={{ paddingTop: 'calc(64px + 2rem)' }}>
+      {/* Sticky Hero Header */}
+      <div className="page-hero">
         <Container>
           <BackButton fallback="/dashboard" />
           <h1 className="mb-1">
@@ -45,20 +48,59 @@ const ReportIssue = () => {
 
       <Container className="py-5" style={{ maxWidth: 720 }}>
 
-        {/* Success toast */}
-        <ToastContainer position="top-center" className="mt-3">
-          <Toast show={success} onClose={() => navigate('/status')} delay={4000} autohide bg="success">
-            <Toast.Header><strong className="me-auto text-success">✓ Issue Submitted!</strong></Toast.Header>
-            <Toast.Body className="text-white">
-              Your report <strong>{issueId}</strong> has been submitted. Redirecting to status…
-            </Toast.Body>
-          </Toast>
-        </ToastContainer>
+        {/* Floating Success Toast Overlay at screen top */}
+        {success && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 9999,
+              minWidth: '340px',
+              maxWidth: '90vw',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+              borderRadius: '12px',
+              overflow: 'hidden',
+            }}
+          >
+            <Alert
+              variant="success"
+              dismissible
+              onClose={() => navigate('/status')}
+              className="mb-0 shadow-lg border-0"
+              style={{ background: '#10b981', color: '#fff' }}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <i className="bi bi-check-circle-fill fs-5" />
+                <div>
+                  <strong>Issue Submitted Successfully!</strong>
+                  <div style={{ fontSize: '.84rem', opacity: 0.95 }}>
+                    Report ID: <strong>{issueId}</strong>. Redirecting to Track Status…
+                  </div>
+                </div>
+              </div>
+            </Alert>
+          </div>
+        )}
 
+        {/* Floating Error Alert at screen top */}
         {error && (
-          <Alert variant="danger" dismissible onClose={() => setError('')}>
-            <i className="bi bi-exclamation-circle-fill me-2" />{error}
-          </Alert>
+          <div
+            style={{
+              position: 'fixed',
+              top: '80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 9999,
+              minWidth: '320px',
+              maxWidth: '90vw',
+            }}
+          >
+            <Alert variant="danger" dismissible onClose={() => setError('')} className="shadow-lg border-0">
+              <i className="bi bi-exclamation-circle-fill me-2" />{error}
+            </Alert>
+          </div>
         )}
 
         <Row>

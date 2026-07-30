@@ -3,6 +3,7 @@ import { getIssues } from '../services/issueService';
 import { useFetch } from '../hooks/useFetch';
 import { getStatusBadgeColor, formatDate } from '../utils/helpers';
 import BackButton from '../components/BackButton';
+import MapView from '../components/MapView';
 
 function IssueDashboard() {
   const { data: issues, loading } = useFetch(getIssues, []);
@@ -45,14 +46,10 @@ function IssueDashboard() {
         </div>
       </div>
 
-      {/* Map placeholder */}
+      {/* Map view */}
       {view === 'map' && (
-        <div className="card scr-card mb-4" style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e8ecf0' }}>
-          <div className="text-center text-muted">
-            <i className="bi bi-map" style={{ fontSize: '3rem', opacity: 0.3 }}></i>
-            <p className="mt-2 mb-0">Leaflet map will render here.</p>
-            <small>Install <code>react-leaflet</code> and replace this div with &lt;MapContainer&gt;.</small>
-          </div>
+        <div className="card scr-card mb-4 p-2">
+          <MapView issues={filtered} height="440px" />
         </div>
       )}
 
