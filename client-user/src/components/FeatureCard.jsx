@@ -1,0 +1,72 @@
+import { Card, Button } from 'react-bootstrap';
+
+/**
+ * FeatureCard.jsx — Reusable dashboard card.
+ *
+ * Props:
+ *  icon        {string}    Bootstrap icon class e.g. "bi-camera-fill"
+ *  iconClass   {string}    Background class e.g. "ci-blue"
+ *  title       {string}    Card heading
+ *  description {string}    Short description below heading
+ *  actionLabel {string}    Primary CTA button text
+ *  onAction    {Function}  Called when CTA is clicked
+ *  badge       {node}      Optional badge/chip to show next to title
+ *  children    {node}      Optional extra content inside card body
+ *  footer      {node}      Optional footer below main content
+ */
+const FeatureCard = ({
+  icon,
+  iconClass = 'ci-blue',
+  title,
+  description,
+  actionLabel,
+  onAction,
+  badge,
+  children,
+  footer,
+}) => (
+  <Card className="feature-card h-100">
+    <Card.Body className="d-flex flex-column gap-3 p-4">
+      {/* Header row */}
+      <div className="d-flex align-items-center gap-3">
+        <div className={`card-icon-wrap ${iconClass}`}>
+          <i className={`bi ${icon}`} />
+        </div>
+        <div className="flex-grow-1">
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            <h2 className="mb-0 fw-bold" style={{ fontSize: '1.05rem', color: '#0f172a' }}>
+              {title}
+            </h2>
+            {badge}
+          </div>
+          {description && (
+            <p className="mb-0 mt-1" style={{ fontSize: '.83rem', color: '#64748b', lineHeight: 1.5 }}>
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Extra content slot */}
+      {children && <div className="flex-grow-1">{children}</div>}
+
+      {/* Footer slot */}
+      {footer && <div>{footer}</div>}
+
+      {/* Primary CTA */}
+      {actionLabel && (
+        <Button
+          variant="primary"
+          className="mt-auto fw-semibold rounded-pill px-4"
+          style={{ background: 'var(--civic-blue)', borderColor: 'var(--civic-blue)', fontSize: '.875rem' }}
+          onClick={onAction}
+          id={`feature-card-btn-${title?.replace(/\s+/g, '-').toLowerCase()}`}
+        >
+          {actionLabel}
+        </Button>
+      )}
+    </Card.Body>
+  </Card>
+);
+
+export default FeatureCard;
