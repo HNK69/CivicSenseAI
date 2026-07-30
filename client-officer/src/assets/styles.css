@@ -1,0 +1,158 @@
+/* =====================================================================
+   Smart Civic Reporter — Officer Dashboard
+   Global Theme & Layout Styles
+   ===================================================================== */
+
+/* ── CSS Custom Properties ──────────────────────────────────────────── */
+:root {
+  --scr-navy:        #0a3d62;
+  --scr-navy-light:  #1a5276;
+  --scr-navy-dark:   #072a44;
+  --scr-green:       #27ae60;
+  --scr-orange:      #e67e22;
+  --scr-red:         #c0392b;
+  --scr-page-bg:     #f0f2f5;
+  --scr-card-bg:     #ffffff;
+  --scr-sidebar-w:   260px;
+  --scr-navbar-h:    60px;
+  --scr-shadow:      0 4px 16px rgba(10, 61, 98, 0.10);
+  --scr-shadow-hover:0 8px 28px rgba(10, 61, 98, 0.18);
+  --scr-radius:      10px;
+  --scr-transition:  all 0.22s ease;
+}
+
+/* ── Reset / Base ───────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--scr-page-bg);
+  color: #1a2533;
+  line-height: 1.6;
+}
+
+/* ── Google Font (Inter via import) ────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
+
+/* ── Navbar ─────────────────────────────────────────────────────────── */
+.scr-navbar {
+  height: var(--scr-navbar-h);
+  background: var(--scr-navy) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+  z-index: 1030;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+}
+.scr-navbar .navbar-brand { font-weight: 700; font-size: 1.1rem; letter-spacing: 0.3px; }
+.scr-navbar .nav-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.4);
+  object-fit: cover;
+}
+.scr-notif-badge { font-size: 0.65rem; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
+.scr-sidebar {
+  width: var(--scr-sidebar-w);
+  background: var(--scr-navy);
+  min-height: 100vh;
+  position: fixed;
+  top: var(--scr-navbar-h);
+  left: 0;
+  bottom: 0;
+  z-index: 1020;
+  overflow-y: auto;
+  transition: var(--scr-transition);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scr-navy-light) transparent;
+}
+.scr-sidebar::-webkit-scrollbar { width: 4px; }
+.scr-sidebar::-webkit-scrollbar-thumb { background: var(--scr-navy-light); border-radius: 4px; }
+
+.scr-sidebar .nav-link {
+  color: rgba(255,255,255,0.72) !important;
+  border-radius: 8px;
+  margin: 2px 8px;
+  padding: 9px 14px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: var(--scr-transition);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.scr-sidebar .nav-link:hover,
+.scr-sidebar .nav-link.active {
+  background: rgba(255,255,255,0.13) !important;
+  color: #ffffff !important;
+}
+.scr-sidebar .nav-link.active {
+  background: rgba(255,255,255,0.20) !important;
+  border-left: 3px solid var(--scr-green);
+}
+.scr-sidebar .nav-link i { font-size: 1.05rem; min-width: 20px; }
+
+/* ── Main content area ──────────────────────────────────────────────── */
+.scr-main-content {
+  margin-left: var(--scr-sidebar-w);
+  margin-top: var(--scr-navbar-h);
+  padding: 28px 24px;
+  min-height: calc(100vh - var(--scr-navbar-h));
+  transition: var(--scr-transition);
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────── */
+.scr-card {
+  border: none !important;
+  border-radius: var(--scr-radius) !important;
+  box-shadow: var(--scr-shadow);
+  transition: var(--scr-transition);
+  background: var(--scr-card-bg);
+}
+.scr-card:hover { box-shadow: var(--scr-shadow-hover); transform: translateY(-2px); }
+
+.scr-feature-card .card-icon {
+  width: 52px; height: 52px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem;
+  background: rgba(10, 61, 98, 0.08);
+  color: var(--scr-navy);
+}
+.scr-feature-card .card-title { font-size: 0.85rem; color: #6c757d; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.scr-feature-card .card-stat  { font-size: 1.75rem; font-weight: 700; color: var(--scr-navy); }
+
+/* ── Page headings ──────────────────────────────────────────────────── */
+.scr-page-header {
+  border-left: 4px solid var(--scr-navy);
+  padding-left: 14px;
+  margin-bottom: 24px;
+}
+.scr-page-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--scr-navy); margin: 0; }
+.scr-page-header p  { font-size: 0.875rem; color: #6c757d; margin: 4px 0 0; }
+
+/* ── Chat (Copilot) ─────────────────────────────────────────────────── */
+.scr-chat-box {
+  height: 420px;
+  overflow-y: auto;
+  background: #f8f9fa;
+  border-radius: var(--scr-radius);
+  padding: 16px;
+  scroll-behavior: smooth;
+}
+.scr-chat-bubble { max-width: 78%; border-radius: 14px; padding: 10px 16px; font-size: 0.9rem; line-height: 1.5; }
+.scr-chat-bubble.officer { background: var(--scr-navy); color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+.scr-chat-bubble.ai      { background: #fff; color: #1a2533; border: 1px solid #dee2e6; border-bottom-left-radius: 4px; }
+.scr-chat-meta { font-size: 0.72rem; color: #adb5bd; margin-top: 4px; }
+
+/* ── Responsive — collapse sidebar on mobile ────────────────────────── */
+@media (max-width: 991.98px) {
+  .scr-sidebar       { display: none; }
+  .scr-main-content  { margin-left: 0; padding: 18px 14px; }
+}
+
+/* ── Utility ─────────────────────────────────────────────────────────── */
+.cursor-pointer { cursor: pointer; }
+.fw-600 { font-weight: 600; }
