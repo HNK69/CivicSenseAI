@@ -60,9 +60,15 @@ class GemmaGenerationError(AIServiceError):
 
 
 class GemmaValidationError(AIServiceError):
-    """Raised when Gemma's JSON output fails Pydantic schema validation."""
+    """Raised when Gemma's JSON output fails Pydantic schema validation.
 
-    status_code = HTTPStatus.UNPROCESSABLE_ENTITY.value
+    This is an upstream dependency failure (Gemma produced invalid output),
+    NOT a client request problem — the request was valid.  502 Bad Gateway
+    correctly signals that the AI service received an invalid response from
+    its upstream (Ollama/Gemma).
+    """
+
+    status_code = HTTPStatus.BAD_GATEWAY.value
 
 
 class FAISSError(AIServiceError):
@@ -73,5 +79,11 @@ class FAISSError(AIServiceError):
 
 class MediaFetchError(AIServiceError):
     """Raised when a Cloudinary URL cannot be fetched for analysis."""
+
+    status_code = HTTPStatus.BAD_GATEWAY.value
+
+
+class EmbeddingError(AIServiceError):
+    """Raised when bge-m3 embedding generation via Ollama /api/embed fails."""
 
     status_code = HTTPStatus.BAD_GATEWAY.value

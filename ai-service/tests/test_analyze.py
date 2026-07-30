@@ -493,10 +493,10 @@ def test_route_gemma_connection_error_returns_503(make_test_client):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 14. Route: Gemma validation error → 422 with correlation_id in body
+# 14. Route: Gemma validation error → 502 with correlation_id in body
 # ══════════════════════════════════════════════════════════════════════════════
 
-def test_route_gemma_validation_error_returns_422(make_test_client):
+def test_route_gemma_validation_error_returns_502(make_test_client):
     failing_gemma = AsyncMock(spec=GemmaClientProtocol)
     failing_gemma.generate_structured.side_effect = GemmaValidationError(
         "Gemma output failed schema validation for GemmaAnalysisOutput",
@@ -505,7 +505,7 @@ def test_route_gemma_validation_error_returns_422(make_test_client):
     tc = make_test_client(gemma_override=failing_gemma)
 
     resp = tc.post("/api/v1/analyze", json=_body())
-    assert resp.status_code == 422
+    assert resp.status_code == 502
     body = resp.json()
     assert "correlation_id" in body
 

@@ -31,12 +31,15 @@ from fastapi.routing import APIRouter
 
 from app.core.config import get_settings
 from app.core.exceptions import AIServiceError
+from app.core.embedding_client import EmbeddingClient
 from app.core.gemma_client import GemmaClient
 from app.core.logging import setup_logging
 from app.core.middleware import CorrelationIDMiddleware
 from app.faiss.index_manager import FAISSIndexManager
+from app.faiss.metadata_store import MetadataStore
 from app.routes.health import router as health_router
 from app.routes.analyze import router as analyze_router
+from app.routes.duplicates import router as duplicates_router
 
 # ── Logging must be configured before the first log line ─────────────────────
 setup_logging()
@@ -87,7 +90,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             note="Starting in degraded mode",
         )
 
-    # ── 2. FAISS index ────────────────────────────────────────────────────────
+    # ── 2. EmbeddingClient (bge-m3) ────────────────────────────────────────────
+    embedding_client = EmbeddingClient(settings=settings)
+    app.state.embedding_client = embedding_client
+
+    # ── 3. FAISS index ────────────────────────────────────────────────────────
     faiss_manager = FAISSIndexManager(settings=settings)
     try:
         faiss_manager.load()
@@ -100,7 +107,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     app.state.faiss_manager = faiss_manager
 
-    # ── 3. Mark startup complete ──────────────────────────────────────────────
+    # ── 4. Metadata store (SQLite) ────────────────────────────────────────────
+    metadata_store = MetadataStore(settings=settings)
+    try:
+        await metadata_store.initialize()
+    except Exception as exc:
+        logger.warning(
+            "service.startup.metadata_store_failed",
+            error=str(exc),
+            note="Metadata store not available; starting in degraded mode",
+        )
+    app.state.metadata_store = metadata_store
+
+    # ── 5. Mark startup complete ──────────────────────────────────────────────
     app.state.startup_complete = True
     logger.info(
         "service.startup.complete",
@@ -110,8 +129,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield  # ── Application running ──────────────────────────────────────────
 
-    # ── 4. Shutdown ───────────────────────────────────────────────────────────
+    # ── 6. Shutdown ───────────────────────────────────────────────────────────
     logger.info("service.shutdown")
+    await metadata_store.close()
+    await embedding_client.close()
     await gemma_client.close()
     logger.info("service.shutdown.complete")
 
@@ -180,8 +201,8 @@ def create_app() -> FastAPI:
     api_router = APIRouter(prefix="/api/v1")
     api_router.include_router(health_router)
     api_router.include_router(analyze_router)
+    api_router.include_router(duplicates_router)
     # Future modules attach here:
-    # api_router.include_router(detect_duplicates_router)
     # api_router.include_router(verify_repair_router)
     # api_router.include_router(copilot_router)
 

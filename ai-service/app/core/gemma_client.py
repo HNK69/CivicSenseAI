@@ -209,7 +209,41 @@ class GemmaClient:
         log.debug("gemma.generate_structured.request")
 
         raw_content = await self._post_chat(payload)
-        return self._parse_and_validate(raw_content, response_schema)
+
+        # ── Corrective retry on validation failure ────────────────────────────
+        # If Gemma's output fails schema validation, re-prompt once with the
+        # validation error appended.  Gemma can often self-correct minor schema
+        # violations (e.g. a missing field, wrong enum casing) when told what
+        # went wrong.  If the retry also fails, raise the original error.
+        try:
+            return self._parse_and_validate(raw_content, response_schema)
+        except GemmaValidationError as first_error:
+            log.warning(
+                "gemma.generate_structured.validation_failed_retrying",
+                error=str(first_error.detail),
+            )
+
+            # Build corrective follow-up: add Gemma's bad response + our
+            # correction as new messages in the conversation.
+            payload["messages"].append(
+                {"role": "assistant", "content": raw_content}
+            )
+            payload["messages"].append({
+                "role": "user",
+                "content": (
+                    "Your previous JSON response failed schema validation with "
+                    f"the following errors:\n\n{first_error.detail}\n\n"
+                    "Please regenerate your response, fixing these errors. "
+                    "Return ONLY the corrected JSON object."
+                ),
+            })
+
+            retry_content = await self._post_chat(payload)
+            try:
+                return self._parse_and_validate(retry_content, response_schema)
+            except GemmaValidationError:
+                # Retry also failed — raise the original error (more informative)
+                raise first_error
 
 
     async def check_health(self) -> GemmaHealthStatus:

@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     # making inference 10–50x slower and reliably exceeding any timeout.
     analyze_num_ctx: int = Field(default=8192)
 
+    # ── /detect-duplicates ────────────────────────────────────────────────────
+    duplicate_num_ctx: int = Field(default=8192)
+    duplicate_similarity_threshold: float = Field(default=0.3)
+    embedding_timeout_seconds: int = Field(default=30)
+    faiss_persist_every_write: bool = Field(default=True)
+    faiss_index_version: int = Field(default=1)
+
     # ── Derived properties ────────────────────────────────────────────────────
     @property
     def ollama_base_url(self) -> str:
