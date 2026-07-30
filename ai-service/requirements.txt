@@ -1,0 +1,34 @@
+# ── Core Framework ─────────────────────────────────────────────────────────────
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+httpx==0.28.1
+
+# ── Configuration & Validation ─────────────────────────────────────────────────
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# ── Structured Logging ─────────────────────────────────────────────────────────
+structlog==24.4.0
+
+# ── Embeddings (bge-m3 via sentence-transformers) ──────────────────────────────
+sentence-transformers==3.3.1
+torch==2.5.1
+transformers==4.47.1
+
+# ── FAISS (CPU — swap for faiss-gpu if CUDA available) ─────────────────────────
+faiss-cpu==1.9.0.post1
+
+# ── Computer Vision ────────────────────────────────────────────────────────────
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+
+# ── Image / HTTP utilities ─────────────────────────────────────────────────────
+Pillow==11.0.0
+aiofiles==24.1.0
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-mock==3.14.0
+respx==0.21.1
+anyio==4.7.0
