@@ -23,8 +23,8 @@ const connectDB = async () => {
       attempt++;
       console.error(`[db] Connection attempt ${attempt}/${MAX_RETRIES} failed: ${err.message}`);
       if (attempt >= MAX_RETRIES) {
-        console.error('[db] FATAL: Could not connect to MongoDB after maximum retries. Exiting.');
-        process.exit(1);
+        console.warn('[db] WARNING: Could not connect to MongoDB after maximum retries. Server will stay up but DB-dependent routes will return 503.');
+        return; // Non-fatal: do NOT call process.exit(1)
       }
       // Exponential back-off (2s, 4s, 8s …)
       await new Promise(res => setTimeout(res, 2000 * attempt));

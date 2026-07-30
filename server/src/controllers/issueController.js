@@ -239,6 +239,10 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
  * Citizen's own issues with optional status filter.
  */
 exports.citizenGetMyIssues = asyncHandler(async (req, res) => {
+  const mongoose = require('mongoose');
+  if (mongoose.connection.readyState !== 1) {
+    return error(res, 'Database unavailable — please try again shortly', 503);
+  }
   const { status, page = 1, limit = 20 } = req.query;
   const filter = { isDeleted: false }; // TODO: filter by req.user._id after auth is added
   if (status) filter.status = status;
@@ -272,6 +276,10 @@ exports.citizenGetIssue = asyncHandler(async (req, res) => {
  * Query: lat, lng, radius (km, default 2)
  */
 exports.citizenGetNearby = asyncHandler(async (req, res) => {
+  const mongoose = require('mongoose');
+  if (mongoose.connection.readyState !== 1) {
+    return error(res, 'Database unavailable — please try again shortly', 503);
+  }
   const { lat, lng, radius = 2, limit = 20 } = req.query;
   if (!lat || !lng) return error(res, 'lat and lng are required', 400);
 

@@ -18,16 +18,7 @@ initSocketHandler(io);
 
 /* ---- Boot sequence ---- */
 const start = async () => {
-  // 1. Connect to MongoDB (exits on failure after retries)
-  await connectDB();
-
-  // 2. Start scheduled jobs
-  startCleanupJob();
-
-  // 3. Start AI service health monitor (polls every 30s per spec)
-  startAIMonitor(30000);
-
-  // 3. Start HTTP server
+  // 1. Start HTTP server immediately
   httpServer.listen(PORT, () => {
     console.log(`
 ╔══════════════════════════════════════════════════╗
@@ -40,6 +31,17 @@ const start = async () => {
 ║  Officer  → ${process.env.CLIENT_OFFICER_URL || 'http://localhost:5173'}   ║
 ╚══════════════════════════════════════════════════╝
     `);
+  });
+
+  // 2. Start scheduled jobs
+  startCleanupJob();
+
+  // 3. Start AI service health monitor (polls every 30s per spec)
+  startAIMonitor(30000);
+
+  // 4. Connect to MongoDB in background
+  connectDB().catch((err) => {
+    console.warn('[db] MongoDB initial connection attempt warning:', err.message);
   });
 };
 
