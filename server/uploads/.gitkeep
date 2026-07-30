@@ -1,0 +1,3 @@
+# Local temp storage for Multer before Cloudinary upload.
+# Files here are transient — do not commit real uploads.
+# This .gitkeep ensures the folder exists in git.
