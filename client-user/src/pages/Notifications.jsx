@@ -1,6 +1,7 @@
 import { Container, Card, Button, Spinner, Badge, ButtonGroup, Alert } from 'react-bootstrap';
 import NotificationItem from '../components/NotificationItem.jsx';
 import { useNotificationContext } from '../context/NotificationContext.jsx';
+import BackButton from '../components/BackButton.jsx';
 
 /**
  * Notifications.jsx — Full notification history page.
@@ -20,9 +21,9 @@ const Notifications = () => {
 
   return (
     <>
-      {/* Hero */}
       <div className="page-hero" style={{ paddingTop: 'calc(64px + 2rem)' }}>
         <Container>
+          <BackButton fallback="/dashboard" />
           <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
             <div>
               <h1 className="mb-1">

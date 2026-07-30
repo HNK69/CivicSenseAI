@@ -5,6 +5,7 @@ import useFetch from '../hooks/useFetch.js';
 import { getMyIssues } from '../services/issueService.js';
 import { categoryIconMap } from '../utils/statusColorMap.js';
 import { formatDate, timeAgo } from '../utils/formatDate.js';
+import BackButton from '../components/BackButton.jsx';
 
 /**
  * TrackStatus.jsx — Full table of citizen's reported issues with
@@ -38,6 +39,7 @@ const TrackStatus = () => {
       {/* Hero */}
       <div className="page-hero" style={{ paddingTop: 'calc(64px + 2rem)' }}>
         <Container>
+          <BackButton fallback="/dashboard" />
           <h1 className="mb-1">
             <i className="bi bi-list-check me-2" />My Issue Reports
           </h1>

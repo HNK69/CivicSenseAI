@@ -3,6 +3,7 @@ import { getChatHistory, sendMessage } from '../services/copilotService';
 import { useFetch } from '../hooks/useFetch';
 import { formatDate } from '../utils/helpers';
 import { useAuth } from '../hooks/useAuth';
+import BackButton from '../components/BackButton';
 
 function MunicipalCopilot() {
   const { officer } = useAuth();
@@ -45,6 +46,7 @@ function MunicipalCopilot() {
   return (
     <div>
       <div className="scr-page-header">
+        <BackButton fallback="/dashboard" />
         <h1><i className="bi bi-chat-dots me-2"></i>Municipal Copilot</h1>
         <p>Ask AI anything about civic data — issues, contractors, zones, trends.</p>
       </div>

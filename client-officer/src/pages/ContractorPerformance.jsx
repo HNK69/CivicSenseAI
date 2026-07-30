@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getContractors, flagContractor, unflagContractor } from '../services/contractorService';
 import { useFetch } from '../hooks/useFetch';
 import { renderStars, formatDate } from '../utils/helpers';
+import BackButton from '../components/BackButton';
 
 function ContractorPerformance() {
   const { data: contractors, loading, refetch } = useFetch(getContractors, []);
@@ -17,6 +18,7 @@ function ContractorPerformance() {
   return (
     <div>
       <div className="scr-page-header">
+        <BackButton fallback="/dashboard" />
         <h1><i className="bi bi-star me-2"></i>Contractor Performance</h1>
         <p>Monitor contractor ratings, complaint counts, and flag underperformers.</p>
       </div>

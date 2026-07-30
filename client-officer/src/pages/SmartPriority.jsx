@@ -1,6 +1,7 @@
 import React from 'react';
 import { getPrioritizedIssues } from '../services/priorityService';
 import { useFetch } from '../hooks/useFetch';
+import BackButton from '../components/BackButton';
 
 const PRIORITY_BADGE = {
   CRITICAL: 'bg-danger',
@@ -15,6 +16,7 @@ function SmartPriority() {
   return (
     <div>
       <div className="scr-page-header">
+        <BackButton fallback="/dashboard" />
         <h1><i className="bi bi-sort-down me-2"></i>Smart Priority</h1>
         <p>AI-ranked issue list based on upvotes, severity, category, and days open.</p>
       </div>

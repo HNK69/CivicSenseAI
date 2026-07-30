@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Alert, Toast, ToastContainer } from 'react-bootstrap';
 import IssueUploadForm from '../components/IssueUploadForm.jsx';
 import { reportIssue } from '../services/issueService.js';
+import BackButton from '../components/BackButton.jsx';
 
 /**
  * ReportIssue.jsx — Full-page issue reporting form.
@@ -34,6 +35,7 @@ const ReportIssue = () => {
       {/* Hero */}
       <div className="page-hero" style={{ paddingTop: 'calc(64px + 2rem)' }}>
         <Container>
+          <BackButton fallback="/dashboard" />
           <h1 className="mb-1">
             <i className="bi bi-camera-fill me-2" />Report a Civic Issue
           </h1>
