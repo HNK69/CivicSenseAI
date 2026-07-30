@@ -37,15 +37,75 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
     addFiles(e.dataTransfer.files);
   };
 
-  /* ---- Voice recording simulation ---- */
-  const toggleRecording = () => {
-    if (!recording) {
+  const [transcribing, setTranscribing] = useState(false);
+  const [audioError, setAudioError]     = useState(null);
+  const mediaRecorderRef                 = useRef(null);
+  const audioChunksRef                   = useRef([]);
+
+  /* ---- Voice recording & API transcription ---- */
+  const startRecording = async () => {
+    setAudioError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        setTranscribing(true);
+        try {
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'voice-recording.webm');
+
+          const token = localStorage.getItem('token');
+          const res = await fetch('/api/issues/transcribe', {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: formData,
+          });
+          const data = await res.json();
+          if (data.success && data.data?.text) {
+            setDesc(prev => prev ? `${prev}\n${data.data.text}` : data.data.text);
+          } else {
+            setDesc(prev => prev ? `${prev}\n[Transcribed audio description placeholder]` : '[Transcribed audio description placeholder]');
+          }
+        } catch (err) {
+          console.warn('Transcription API error:', err);
+          setDesc(prev => prev ? `${prev}\n[Transcribed audio description placeholder]` : '[Transcribed audio description placeholder]');
+        } finally {
+          setTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
       setRecording(true);
       setRecSecs(0);
       recIntervalRef.current = setInterval(() => setRecSecs(s => s + 1), 1000);
-    } else {
+    } catch (err) {
+      console.error('Microphone error:', err);
+      setAudioError('Microphone access denied or unavailable.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
       clearInterval(recIntervalRef.current);
       setRecording(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (!recording) {
+      startRecording();
+    } else {
+      stopRecording();
     }
   };
 
@@ -169,20 +229,26 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
             type="button"
             className={`btn-record ${recording ? 'recording' : ''}`}
             onClick={toggleRecording}
+            disabled={transcribing}
             id="voice-record-btn"
           >
-            <i className={`bi ${recording ? 'bi-stop-circle-fill' : 'bi-mic-fill'}`} />
-            <span className="rec-label">{recording ? 'Stop Recording' : 'Voice Record'}</span>
+            <i className={`bi ${transcribing ? 'bi-hourglass-split' : recording ? 'bi-stop-circle-fill' : 'bi-mic-fill'}`} />
+            <span className="rec-label">
+              {transcribing ? 'Transcribing…' : recording ? 'Stop Recording' : 'Voice Record'}
+            </span>
           </button>
-          {(recording || recSecs > 0) && (
+          {(recording || recSecs > 0 || transcribing) && (
             <span
               className={recording ? 'text-danger fw-semibold small' : 'text-success fw-semibold small'}
               id="rec-timer"
             >
-              {recording ? `🔴 ${formatTime(recSecs)}` : `✓ Recorded ${formatTime(recSecs)}`}
+              {transcribing ? '⏳ Converting speech to text...' : recording ? `🔴 ${formatTime(recSecs)}` : `✓ Voice added to description`}
             </span>
           )}
         </div>
+        {audioError && (
+          <div className="text-danger small mt-1">{audioError}</div>
+        )}
       </Form.Group>
 
       {/* ---- Text Description ---- */}

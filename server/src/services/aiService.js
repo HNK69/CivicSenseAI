@@ -68,6 +68,14 @@ const verifyRepair = async (workOrderId, evidence) => {
   return { workOrderId, verdict: 'pending', confidence: null, message: 'AI repair verification placeholder.' };
 };
 
+/* ---- transcribeAudio ---- */
+const transcribeAudio = async (audioFileUrlOrBuffer) => {
+  // TODO: return (await getAxios().post('/transcribe', { audio: audioFileUrlOrBuffer })).data;
+  return {
+    text: 'Pothole on main road causing heavy traffic and safety hazard near the market junction.',
+  };
+};
+
 /* ---- municipalCopilotQuery ---- */
 const municipalCopilotQuery = async (query, ctx = {}) => {
   // TODO: return (await getAxios().post('/copilot', { query, context: ctx })).data;
@@ -85,5 +93,7 @@ module.exports = {
   runAIInvestigation,
   findDuplicateMergeCandidates,
   verifyRepair,
+  transcribeAudio,
   municipalCopilotQuery,
 };
+

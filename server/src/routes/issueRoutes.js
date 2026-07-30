@@ -8,6 +8,7 @@ const {
 } = require('../middleware/authMiddleware');
 const {
   uploadIssueMedia,
+  uploadAudio,
   handleCloudinaryUpload,
 } = require('../middleware/uploadMiddleware');
 
@@ -16,6 +17,14 @@ const {
    ==================================================================== */
 
 const citizenIssueRouter = require('express').Router();
+
+// POST /api/issues/transcribe — voice recording to text
+citizenIssueRouter.post(
+  '/transcribe',
+  verifyToken, requireCitizen,
+  uploadAudio,
+  ic.transcribeVoice,
+);
 
 // GET /api/issues/nearby   — must be BEFORE /:id to avoid conflict
 citizenIssueRouter.get(

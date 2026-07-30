@@ -238,6 +238,17 @@ exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
   return success(res, { issue }, confirmed ? 'Repair confirmed' : 'Issue re-opened');
 });
 
+/**
+ * POST /api/issues/transcribe
+ * Audio voice transcription endpoint (stub).
+ */
+exports.transcribeVoice = asyncHandler(async (req, res) => {
+  const { transcribeAudio } = require('../services/aiService');
+  const audioFile = req.file;
+  const result = await transcribeAudio(audioFile ? (audioFile.buffer || audioFile.path) : null);
+  return success(res, { text: result.text || 'Pothole on main road causing heavy traffic and safety hazard near the market junction.' }, 'Audio transcribed successfully');
+});
+
 /* ====================================================================
    OFFICER — Issue Controller Functions
    ==================================================================== */

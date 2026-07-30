@@ -5,7 +5,8 @@ const { uploadToCloudinary } = require('../config/cloudinary');
 /* ---- Allowed MIME types ---- */
 const ALLOWED_IMAGES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const ALLOWED_VIDEOS = ['video/mp4', 'video/webm', 'video/quicktime'];
-const ALLOWED_ALL    = [...ALLOWED_IMAGES, ...ALLOWED_VIDEOS];
+const ALLOWED_AUDIO  = ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/mp4', 'audio/x-m4a', 'audio/mpeg'];
+const ALLOWED_ALL    = [...ALLOWED_IMAGES, ...ALLOWED_VIDEOS, ...ALLOWED_AUDIO];
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -13,7 +14,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const storage = multer.memoryStorage();
 
 const fileFilter = (_req, file, cb) => {
-  if (ALLOWED_ALL.includes(file.mimetype)) {
+  if (ALLOWED_ALL.includes(file.mimetype) || file.mimetype.startsWith('audio/')) {
     cb(null, true);
   } else {
     cb(new Error(`Unsupported file type: ${file.mimetype}`), false);
@@ -73,10 +74,13 @@ const uploadIssueMedia = upload.fields([
 ]);
 
 const uploadAvatar = upload.single('avatar');
+const uploadAudio  = upload.single('audio');
 
 module.exports = {
   upload,
   uploadIssueMedia,
   uploadAvatar,
+  uploadAudio,
   handleCloudinaryUpload,
 };
+
