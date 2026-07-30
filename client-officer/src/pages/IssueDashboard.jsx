@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getIssues } from '../services/issueService';
 import { useFetch } from '../hooks/useFetch';
 import { getStatusBadgeColor, formatDate } from '../utils/helpers';
+import BackButton from '../components/BackButton';
 
 function IssueDashboard() {
   const { data: issues, loading } = useFetch(getIssues, []);
@@ -13,6 +14,7 @@ function IssueDashboard() {
   return (
     <div>
       <div className="scr-page-header">
+        <BackButton fallback="/dashboard" />
         <h1><i className="bi bi-map me-2"></i>Issue Dashboard</h1>
         <p>Browse, filter, and manage all reported civic issues across the municipality.</p>
       </div>

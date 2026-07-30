@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getFindings, triggerAnalysis } from '../services/aiInvestigationService';
 import { useFetch } from '../hooks/useFetch';
 import { formatDate } from '../utils/helpers';
+import BackButton from '../components/BackButton';
 
 const SEVERITY_BADGE = { CRITICAL: 'bg-danger', HIGH: 'bg-warning text-dark', MEDIUM: 'bg-info text-dark', LOW: 'bg-secondary' };
 
@@ -17,6 +18,7 @@ function AIInvestigation() {
   return (
     <div>
       <div className="scr-page-header">
+        <BackButton fallback="/dashboard" />
         <h1><i className="bi bi-robot me-2"></i>AI Investigation</h1>
         <p>AI-generated root cause analysis and suggested actions for reported issues.</p>
       </div>

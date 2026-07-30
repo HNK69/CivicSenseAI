@@ -3,6 +3,7 @@ import { getWorkOrders, assignWorkOrder } from '../services/assignService';
 import { useFetch } from '../hooks/useFetch';
 import { DEPARTMENTS } from '../utils/constants';
 import { formatDate } from '../utils/helpers';
+import BackButton from '../components/BackButton';
 
 function AssignWork() {
   const { data: orders, loading, refetch } = useFetch(getWorkOrders, []);
@@ -23,6 +24,7 @@ function AssignWork() {
   return (
     <div>
       <div className="scr-page-header">
+        <BackButton fallback="/dashboard" />
         <h1><i className="bi bi-person-check me-2"></i>Assign Work</h1>
         <p>Create and track work orders — assign issues to municipal departments.</p>
       </div>

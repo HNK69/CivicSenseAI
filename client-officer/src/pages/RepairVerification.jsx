@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getRepairs, verifyRepair } from '../services/repairService';
 import { useFetch } from '../hooks/useFetch';
 import { formatDate } from '../utils/helpers';
+import BackButton from '../components/BackButton';
 
 const STATUS_BADGE = {
   PENDING_VERIFICATION: 'bg-warning text-dark',
@@ -22,6 +23,7 @@ function RepairVerification() {
   return (
     <div>
       <div className="scr-page-header">
+        <BackButton fallback="/dashboard" />
         <h1><i className="bi bi-camera me-2"></i>Repair Verification</h1>
         <p>Compare before/after images and verify or reject contractor repair submissions.</p>
       </div>

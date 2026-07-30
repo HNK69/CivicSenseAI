@@ -7,6 +7,7 @@ import { getNearbyIssues } from '../services/mapService.js';
 import { categoryIconMap } from '../utils/statusColorMap.js';
 
 import { DEFAULT_COORDS } from '../utils/constants.js';
+import BackButton from '../components/BackButton.jsx';
 
 /**
  * NearbyIssuesMap.jsx — Full Leaflet map of nearby reported issues.
@@ -32,6 +33,7 @@ const NearbyIssuesMap = () => {
       {/* Hero */}
       <div className="page-hero" style={{ paddingTop: 'calc(64px + 2rem)' }}>
         <Container>
+          <BackButton fallback="/dashboard" />
           <h1 className="mb-1">
             <i className="bi bi-map-fill me-2" />Nearby Civic Issues
           </h1>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getDuplicateGroups, mergeDuplicates } from '../services/duplicateService';
 import { useFetch } from '../hooks/useFetch';
 import { formatDate } from '../utils/helpers';
+import BackButton from '../components/BackButton';
 
 function DuplicateMerge() {
   const { data: groups, loading, refetch } = useFetch(getDuplicateGroups, []);
@@ -28,6 +29,7 @@ function DuplicateMerge() {
   return (
     <div>
       <div className="scr-page-header">
+        <BackButton fallback="/dashboard" />
         <h1><i className="bi bi-files me-2"></i>Duplicate Merge</h1>
         <p>Identify and merge citizen-reported duplicates to reduce noise and consolidate upvotes.</p>
       </div>

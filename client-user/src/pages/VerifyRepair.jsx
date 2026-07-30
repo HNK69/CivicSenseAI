@@ -3,6 +3,8 @@ import { Container, Row, Col, Card, Button, Spinner, Badge, Modal, Form, Alert }
 import useFetch from '../hooks/useFetch.js';
 import { getPendingVerifications, confirmRepair, disputeRepair } from '../services/verifyService.js';
 import { formatDate } from '../utils/formatDate.js';
+import BackButton from '../components/BackButton.jsx';
+
 
 /**
  * VerifyRepair.jsx — List of completed repairs awaiting citizen verification.
@@ -56,6 +58,7 @@ const VerifyRepair = () => {
       {/* Hero */}
       <div className="page-hero" style={{ paddingTop: 'calc(64px + 2rem)' }}>
         <Container>
+          <BackButton fallback="/dashboard" />
           <h1 className="mb-1">
             <i className="bi bi-patch-check-fill me-2" />Verify Repairs
           </h1>
