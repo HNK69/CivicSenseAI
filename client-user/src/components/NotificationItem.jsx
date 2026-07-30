@@ -1,51 +1,66 @@
+import { motion } from 'framer-motion';
 import { timeAgo } from '../utils/formatDate.js';
 
 /**
- * NotificationItem.jsx — Single notification row.
- *
- * Props:
- *  notification  {Object}    { id, icon, iconBg, iconColor, title, detail, timestamp, read }
- *  onMarkRead    {Function}  Called with notification.id when clicked
+ * NotificationItem.jsx — Single notification row with motion.
  */
 const NotificationItem = ({ notification, onMarkRead }) => {
   const { id, icon, iconBg, iconColor, title, detail, timestamp, read } = notification;
 
   return (
-    <div
+    <motion.div
       className={`notif-item ${!read ? 'unread' : ''}`}
       onClick={() => !read && onMarkRead?.(id)}
       style={{ cursor: !read ? 'pointer' : 'default' }}
       id={`notif-item-${id}`}
+      layout
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2 }}
     >
       {/* Icon */}
       <div
         className="notif-icon flex-shrink-0"
-        style={{ background: iconBg || '#f1f5f9', color: iconColor || '#64748b' }}
+        style={{
+          background: iconBg || 'var(--bg-elevated)',
+          color: iconColor || 'var(--text-secondary)',
+        }}
       >
-        <i className={`bi ${icon || 'bi-bell-fill'}`} />
+        <i className={`bi ${icon || 'bi-bell'}`} />
       </div>
 
       {/* Content */}
       <div className="flex-grow-1 min-w-0">
         <div
-          className={!read ? 'fw-bold' : 'fw-semibold'}
-          style={{ fontSize: '.87rem', color: '#1e293b', lineHeight: 1.4 }}
+          style={{
+            fontWeight: !read ? 600 : 500,
+            fontSize: '.875rem',
+            color: 'var(--text-primary)',
+            lineHeight: 1.4,
+          }}
         >
           {title}
         </div>
         {detail && (
-          <div className="text-muted mt-1" style={{ fontSize: '.78rem', lineHeight: 1.4 }}>
+          <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.4 }}>
             {detail}
           </div>
         )}
-        <div className="mt-1" style={{ fontSize: '.72rem', color: '#94a3b8' }}>
+        <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>
           {timeAgo(timestamp)}
         </div>
       </div>
 
       {/* Unread dot */}
-      {!read && <div className="unread-dot flex-shrink-0" />}
-    </div>
+      {!read && (
+        <motion.div
+          className="unread-dot flex-shrink-0"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500 }}
+        />
+      )}
+    </motion.div>
   );
 };
 

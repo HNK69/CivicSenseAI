@@ -1,18 +1,22 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Navbar, Container, Dropdown } from 'react-bootstrap';
+import { motion } from 'framer-motion';
 import useAuth from '../hooks/useAuth.js';
 import { useNotificationContext } from '../context/NotificationContext.jsx';
 
-/**
- * Navbar.jsx — Top application navbar.
- * - CivicSense AI logo + brand name
- * - Notification bell with unread badge
- * - User avatar dropdown (Profile, Logout)
- */
+const NAV_LINKS = [
+  { path: '/dashboard',     label: 'Home',          icon: 'bi-house' },
+  { path: '/report',        label: 'Report',        icon: 'bi-plus-circle' },
+  { path: '/status',        label: 'My Reports',    icon: 'bi-list-check' },
+  { path: '/map',           label: 'Nearby',        icon: 'bi-map' },
+  { path: '/verify',        label: 'Verify',        icon: 'bi-patch-check' },
+];
+
 const AppNavbar = () => {
-  const { user, logout }        = useAuth();
-  const { unreadCount }         = useNotificationContext();
-  const navigate                = useNavigate();
+  const { user, logout }    = useAuth();
+  const { unreadCount }     = useNotificationContext();
+  const navigate            = useNavigate();
+  const location            = useLocation();
 
   const initials = user?.name
     ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -21,85 +25,125 @@ const AppNavbar = () => {
   return (
     <Navbar className="civic-navbar px-3 px-md-4" expand="lg" fixed="top">
       <Container fluid>
-        {/* ---- Brand ---- */}
+        {/* ── Brand ── */}
         <Navbar.Brand
           className="civic-brand d-flex align-items-center gap-2"
           onClick={() => navigate('/')}
           style={{ cursor: 'pointer' }}
         >
-          <div className="brand-icon">
-            <i className="bi bi-building-fill text-white" />
-          </div>
-          <span>
-            CivicSense <span style={{ color: '#93c5fd' }}>AI</span>
+          <motion.div
+            className="brand-icon"
+            whileHover={{ scale: 1.08 }}
+            transition={{ type: 'spring', stiffness: 400 }}
+          >
+            <i className="bi bi-building-fill" />
+          </motion.div>
+          <span className="brand-text">
+            <span className="brand-civic">Civic</span><span className="brand-sense">Sense</span><span className="brand-ai-tag"> AI</span>
           </span>
         </Navbar.Brand>
 
+        {/* ── Desktop nav links ── */}
+        <div className="d-none d-lg-flex align-items-center gap-1 ms-4">
+          {NAV_LINKS.map(link => {
+            const isActive = location.pathname === link.path ||
+              (link.path !== '/dashboard' && location.pathname.startsWith(link.path));
+            return (
+              <motion.button
+                key={link.path}
+                onClick={() => navigate(link.path)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                style={{
+                  background: isActive ? 'var(--civic-blue-light)' : 'transparent',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  fontSize: '.84rem',
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? 'var(--civic-blue)' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'all .15s ease',
+                  fontFamily: 'Inter, sans-serif',
+                }}
+              >
+                <i className={`bi ${link.icon}`} style={{ fontSize: '.9rem' }} />
+                {link.label}
+              </motion.button>
+            );
+          })}
+        </div>
+
+        {/* ── Right actions ── */}
         <div className="d-flex align-items-center gap-2 ms-auto">
-          {/* ---- Notification Bell ---- */}
-          <button
+          {/* Bell */}
+          <motion.button
             className="nav-bell position-relative"
             onClick={() => navigate('/notifications')}
             aria-label="Notifications"
             id="nav-notifications-btn"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <i className="bi bi-bell-fill" />
+            <i className="bi bi-bell" />
             {unreadCount > 0 && (
-              <span className="badge bg-danger bell-badge" id="notif-badge">
+              <motion.span
+                className="badge bell-badge"
+                id="notif-badge"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500 }}
+              >
                 {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
+              </motion.span>
             )}
-          </button>
+          </motion.button>
 
-          {/* ---- User Avatar Dropdown ---- */}
+          {/* Avatar dropdown */}
           <Dropdown align="end">
             <Dropdown.Toggle
               as="div"
-              className="nav-avatar"
               id="user-avatar-dropdown"
-              style={{ border: 'none', background: 'none', padding: 0 }}
+              style={{
+                border: 'none',
+                background: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              <div className="nav-avatar">{initials}</div>
+              <motion.div
+                className="nav-avatar"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {initials}
+              </motion.div>
             </Dropdown.Toggle>
 
-            <Dropdown.Menu className="shadow border-0 rounded-3 mt-2" style={{ minWidth: 200 }}>
-              {/* User info header */}
-              <div className="px-3 py-2 border-bottom">
-                <div className="fw-bold text-dark" style={{ fontSize: '.9rem' }}>
+            <Dropdown.Menu className="shadow mt-2" style={{ minWidth: 210 }}>
+              <div className="px-3 py-2 mb-1" style={{ borderBottom: '1px solid var(--border-base)' }}>
+                <div className="fw-bold" style={{ fontSize: '.9rem', color: 'var(--text-primary)' }}>
                   {user?.name || 'Citizen'}
                 </div>
-                <div className="text-muted" style={{ fontSize: '.78rem' }}>
-                  {user?.ward} · {user?.city}
+                <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>
+                  {user?.ward}{user?.city ? ` · ${user.city}` : ''}
                 </div>
               </div>
-
-              <Dropdown.Item
-                className="d-flex align-items-center gap-2 py-2"
-                id="nav-profile-link"
-                onClick={() => navigate('/')}
-              >
-                <i className="bi bi-person-circle text-primary" />
-                Profile
+              <Dropdown.Item className="d-flex align-items-center gap-2" onClick={() => navigate('/')} id="nav-profile-link">
+                <i className="bi bi-person" style={{ color: 'var(--civic-blue)' }} />Profile
               </Dropdown.Item>
-
-              <Dropdown.Item
-                className="d-flex align-items-center gap-2 py-2"
-                id="nav-settings-link"
-                onClick={() => navigate('/')}
-              >
-                <i className="bi bi-gear text-secondary" />
-                Settings
+              <Dropdown.Item className="d-flex align-items-center gap-2" onClick={() => navigate('/')} id="nav-settings-link">
+                <i className="bi bi-gear" style={{ color: 'var(--text-muted)' }} />Settings
               </Dropdown.Item>
-
               <Dropdown.Divider />
-
-              <Dropdown.Item
-                className="d-flex align-items-center gap-2 py-2 text-danger"
-                id="nav-logout-btn"
-                onClick={logout}
-              >
-                <i className="bi bi-box-arrow-right" />
-                Logout
+              <Dropdown.Item className="d-flex align-items-center gap-2" style={{ color: 'var(--red)' }} onClick={logout} id="nav-logout-btn">
+                <i className="bi bi-box-arrow-right" />Logout
               </Dropdown.Item>
             </Dropdown.Menu>
           </Dropdown>

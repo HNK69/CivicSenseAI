@@ -1,45 +1,35 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { NAV_ROUTES } from '../utils/constants';
 
-/**
- * Sidebar — fixed left navigation panel.
- * Uses React Router NavLink for automatic active-state styling (.active class).
- * On mobile (<992px) this panel is hidden via CSS; use the Offcanvas toggle in Navbar.
- *
- * To add a new route: update NAV_ROUTES in utils/constants.js — no changes needed here.
- */
 function Sidebar() {
   return (
-    <nav className="scr-sidebar d-flex flex-column py-3">
-      {/* Section label */}
-      <div className="px-3 mb-2">
-        <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
-          Navigation
-        </span>
-      </div>
+    <nav className="scr-sidebar">
+      <div className="scr-sidebar-label">Navigation</div>
 
-      <ul className="nav flex-column gap-1">
-        {NAV_ROUTES.map((route) => (
+      <ul className="nav flex-column gap-0" style={{ padding: '4px 0' }}>
+        {NAV_ROUTES.map((route, idx) => (
           <li className="nav-item" key={route.path}>
-            <NavLink
-              to={route.path}
-              className={({ isActive }) =>
-                `nav-link${isActive ? ' active' : ''}`
-              }
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.04, duration: 0.2 }}
             >
-              <i className={`bi ${route.icon}`}></i>
-              <span>{route.label}</span>
-            </NavLink>
+              <NavLink
+                to={route.path}
+                className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+              >
+                <i className={`bi ${route.icon}`} />
+                <span>{route.label}</span>
+              </NavLink>
+            </motion.div>
           </li>
         ))}
       </ul>
 
-      {/* Footer info */}
-      <div className="mt-auto px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '16px' }}>
-        <small style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72rem' }}>
-          Smart Civic Reporter v1.0
-        </small>
+      <div className="scr-sidebar-footer">
+        CivicSense AI · Officer v1.0
       </div>
     </nav>
   );

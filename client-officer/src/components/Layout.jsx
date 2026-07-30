@@ -1,27 +1,34 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import Navbar from './Navbar.jsx';
 import Sidebar from './Sidebar.jsx';
 
-/**
- * Layout — shell that wraps every page with Navbar + Sidebar.
- * React Router's <Outlet /> renders the active page component.
- *
- * All routes in routes.jsx are nested under this Layout,
- * so every page automatically gets the nav chrome.
- */
+const pageVariants = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: 'easeOut' } },
+  exit:    { opacity: 0, y: -6, transition: { duration: 0.15 } },
+};
+
 function Layout() {
+  const location = useLocation();
+
   return (
     <>
-      {/* Fixed top navbar */}
       <Navbar />
-
-      {/* Fixed left sidebar */}
       <Sidebar />
-
-      {/* Scrollable main content area */}
       <main className="scr-main-content">
-        <Outlet />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
       </main>
     </>
   );
