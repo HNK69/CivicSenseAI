@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     ollama_host: str = Field(default="localhost")
     ollama_port: int = Field(default=11434)
     gemma_model: str = Field(default="gemma4:12b")
-    gemma_timeout_seconds: int = Field(default=120)
+    gemma_timeout_seconds: int = Field(default=300)
     ollama_probe_timeout_seconds: int = Field(default=10)
 
     # ── Embeddings ─────────────────────────────────────────────────────────────
@@ -45,6 +45,26 @@ class Settings(BaseSettings):
     cloudinary_cloud_name: str = Field(default="")
     cloudinary_api_key: str = Field(default="")
     cloudinary_api_secret: str = Field(default="")
+
+    # ── Media download & processing (/analyze) ────────────────────────────────
+    # Maximum bytes accepted per image download (default 10 MB).
+    max_image_bytes: int = Field(default=10_485_760)
+    # Images are resized so neither dimension exceeds this value before
+    # being sent to Gemma, controlling token cost and latency.
+    max_image_dimension: int = Field(default=1024)
+    # Number of keyframes uniformly sampled from a video clip.
+    analyze_max_frames: int = Field(default=4)
+    # Timeout in seconds for a single Cloudinary media download.
+    media_download_timeout_seconds: int = Field(default=30)
+
+    # ── /analyze Gemma call ────────────────────────────────────────────────────
+    # Context window for /analyze.  8192 tokens is sufficient for the actual
+    # /analyze prompt (text + GPS + enum instructions + image descriptions).
+    # WARNING: Do NOT set above 8192 on GPUs with <11GB VRAM — Gemma 4 12B
+    # weights consume ~7.5GB, leaving ~1.5GB for a 8K KV cache.  Exceeding
+    # available VRAM causes Ollama to offload KV cache to system RAM over PCIe,
+    # making inference 10–50x slower and reliably exceeding any timeout.
+    analyze_num_ctx: int = Field(default=8192)
 
     # ── Derived properties ────────────────────────────────────────────────────
     @property

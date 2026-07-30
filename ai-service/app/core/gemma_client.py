@@ -170,6 +170,14 @@ class GemmaClient:
         num_ctx is always forwarded to Ollama's options dict.  Without it,
         Ollama silently defaults Gemma 4 to a 4K context window regardless of
         the model's real capacity, causing silent truncation on large prompts.
+
+        VRAM WARNING: Gemma 4 12B (Q4_K_M) consumes ~7.5 GB VRAM for weights.
+        At num_ctx=8192 the KV cache adds ~1.5 GB (total ~9 GB).
+        At num_ctx=16384 the KV cache adds ~3.0 GB (total ~10.5 GB).
+        On GPUs with <11 GB VRAM, num_ctx>8192 causes Ollama to silently
+        offload the KV cache to system RAM, making inference 10-50x slower
+        and reliably triggering read timeouts.  Do not exceed 8192 unless
+        you have confirmed available VRAM headroom.
         """
         messages = self._build_messages(
             prompt=prompt,
@@ -184,6 +192,11 @@ class GemmaClient:
             "options": {
                 "temperature": temperature,
                 "num_ctx": num_ctx,
+                # num_keep=0: do not cache system-prompt tokens in VRAM between
+                # calls.  The system prompt changes per request in /analyze
+                # (GPS, image count), so cross-call caching wastes VRAM and
+                # interferes with accurate KV cache sizing.
+                "num_keep": 0,
             },
             "format": response_schema.model_json_schema(),
         }
@@ -197,6 +210,7 @@ class GemmaClient:
 
         raw_content = await self._post_chat(payload)
         return self._parse_and_validate(raw_content, response_schema)
+
 
     async def check_health(self) -> GemmaHealthStatus:
         """

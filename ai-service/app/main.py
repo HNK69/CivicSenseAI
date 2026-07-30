@@ -36,6 +36,7 @@ from app.core.logging import setup_logging
 from app.core.middleware import CorrelationIDMiddleware
 from app.faiss.index_manager import FAISSIndexManager
 from app.routes.health import router as health_router
+from app.routes.analyze import router as analyze_router
 
 # ── Logging must be configured before the first log line ─────────────────────
 setup_logging()
@@ -178,8 +179,8 @@ def create_app() -> FastAPI:
     # All module routers attach here. The /api/v1 prefix is declared ONCE.
     api_router = APIRouter(prefix="/api/v1")
     api_router.include_router(health_router)
+    api_router.include_router(analyze_router)
     # Future modules attach here:
-    # api_router.include_router(analyze_router)
     # api_router.include_router(detect_duplicates_router)
     # api_router.include_router(verify_repair_router)
     # api_router.include_router(copilot_router)

@@ -413,7 +413,7 @@ def test_settings_defaults():
         gemma_model="gemma4:12b",
     )
     assert s.ollama_base_url == "http://localhost:11434"
-    assert s.gemma_timeout_seconds == 120
+    assert s.gemma_timeout_seconds == 300   # raised from 120 — see VRAM fix
     assert s.faiss_top_k == 10
     assert s.is_development is True
 
