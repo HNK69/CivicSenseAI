@@ -72,9 +72,9 @@ function Navbar() {
       <div className="d-flex align-items-center gap-3">
         {/* Brand / Logo */}
         <Link to="/dashboard" className="navbar-brand text-white d-flex align-items-center gap-2 mb-0">
-          <i className="bi bi-building-fill" style={{ fontSize: '1.3rem', color: '#1a56db' }}></i>
+          <i className="bi bi-building-fill" style={{ fontSize: '1.4rem', color: '#4fc3f7' }}></i>
           <span>
-            CivicSense <span style={{ color: '#93c5fd', fontWeight: 800 }}>AI</span>
+            Smart Civic<span style={{ color: '#4fc3f7', fontWeight: 800 }}>Reporter</span>
           </span>
         </Link>
 

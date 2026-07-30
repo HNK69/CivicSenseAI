@@ -1,6 +1,11 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import FeatureCard from '../components/FeatureCard.jsx';
+
+/**
+ * Dashboard — home page showing all 8 feature cards in a responsive grid.
+ * Each card's data is defined in DASHBOARD_CARDS — update stats here (or via API later).
+ * No separate card component per feature — all rendered via the reusable FeatureCard.
+ */
 
 const DASHBOARD_CARDS = [
   {
@@ -12,7 +17,7 @@ const DASHBOARD_CARDS = [
     badgeClass:  'bg-primary',
     footerText:  'View Findings',
     footerLink:  '/ai-investigation',
-    accentColor: 'rgba(26,86,219,0.12)',
+    accentColor: 'rgba(52,152,219,0.12)',
   },
   {
     icon:        'bi-map',
@@ -93,70 +98,43 @@ const DASHBOARD_CARDS = [
   },
 ];
 
-const containerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.05 } },
-};
-const itemVariants = {
-  hidden:  { opacity: 0, y: 14 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.22, ease: 'easeOut' } },
-};
-
 function Dashboard() {
   return (
     <div>
       {/* Page header */}
       <div className="scr-page-header">
         <h1>Officer Dashboard</h1>
-        <p>CivicSense AI — All module overview</p>
+        <p>Smart Civic Reporter — All module overview</p>
       </div>
 
       {/* Summary stat strip */}
-      <motion.div
-        className="row g-3 mb-4"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
+      <div className="row g-3 mb-4">
         {[
           { label: 'Total Issues',   value: '142', icon: 'bi-exclamation-circle-fill', color: '#c0392b' },
           { label: 'Resolved Today', value: '8',   icon: 'bi-check-circle-fill',       color: '#27ae60' },
           { label: 'In Progress',    value: '23',  icon: 'bi-arrow-clockwise',         color: '#e67e22' },
           { label: 'Work Orders',    value: '4',   icon: 'bi-clipboard-check-fill',    color: '#0a3d62' },
         ].map((s) => (
-          <motion.div className="col-6 col-lg-3" key={s.label} variants={itemVariants}>
-            <div className="card scr-card scr-stat-card p-3 d-flex flex-row align-items-center gap-3">
-              <div
-                style={{
-                  width: 46, height: 46, borderRadius: 10, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  background: `${s.color}18`, flexShrink: 0,
-                }}
-              >
-                <i className={`bi ${s.icon}`} style={{ fontSize: '1.5rem', color: s.color }}></i>
-              </div>
+          <div className="col-6 col-lg-3" key={s.label}>
+            <div className="card scr-card p-3 d-flex flex-row align-items-center gap-3">
+              <i className={`bi ${s.icon}`} style={{ fontSize: '1.8rem', color: s.color }}></i>
               <div>
-                <div style={{ fontSize: '1.55rem', fontWeight: 700, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
-                <div style={{ fontSize: '0.76rem', color: '#6c757d', fontWeight: 500, marginTop: 2 }}>{s.label}</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '0.78rem', color: '#6c757d' }}>{s.label}</div>
               </div>
             </div>
-          </motion.div>
+          </div>
         ))}
-      </motion.div>
+      </div>
 
       {/* Feature cards grid — 3 cols on lg, 2 on md */}
-      <motion.div
-        className="row g-4"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
+      <div className="row g-4">
         {DASHBOARD_CARDS.map((card) => (
-          <motion.div className="col-lg-4 col-md-6" key={card.footerLink} variants={itemVariants}>
+          <div className="col-lg-4 col-md-6" key={card.footerLink}>
             <FeatureCard {...card} />
-          </motion.div>
+          </div>
         ))}
-      </motion.div>
+      </div>
     </div>
   );
 }

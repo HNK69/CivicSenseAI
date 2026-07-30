@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from 'framer-motion';
 import { timeAgo } from '../utils/formatDate.js';
 
 /**
@@ -12,15 +11,11 @@ const NotificationItem = ({ notification, onMarkRead }) => {
   const { id, icon, iconBg, iconColor, title, detail, timestamp, read } = notification;
 
   return (
-    <motion.div
+    <div
       className={`notif-item ${!read ? 'unread' : ''}`}
       onClick={() => !read && onMarkRead?.(id)}
       style={{ cursor: !read ? 'pointer' : 'default' }}
       id={`notif-item-${id}`}
-      layout
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
     >
       {/* Icon */}
       <div
@@ -49,18 +44,8 @@ const NotificationItem = ({ notification, onMarkRead }) => {
       </div>
 
       {/* Unread dot */}
-      <AnimatePresence>
-        {!read && (
-          <motion.div
-            className="unread-dot flex-shrink-0"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            exit={{ scale: 0 }}
-            transition={{ duration: 0.15 }}
-          />
-        )}
-      </AnimatePresence>
-    </motion.div>
+      {!read && <div className="unread-dot flex-shrink-0" />}
+    </div>
   );
 };
 
