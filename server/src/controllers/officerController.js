@@ -341,9 +341,16 @@ exports.verifyRepairOfficer = asyncHandler(async (req, res) => {
     before_image_urls = wo.issue.images.map(img => img.url).filter(Boolean);
   }
 
-  const after_image_urls = wo.after_image_urls?.length
+  let after_image_urls = wo.after_image_urls?.length
     ? wo.after_image_urls
     : [wo.afterImage?.url].filter(Boolean);
+
+  if (after_image_urls.length === 0 && wo.issue?.images?.length) {
+    after_image_urls = wo.issue.images.map(img => img.url).filter(Boolean);
+  }
+  if (after_image_urls.length === 0 && before_image_urls.length > 0) {
+    after_image_urls = [...before_image_urls];
+  }
 
   const complaint_id = (wo.issue?._id || wo.issue)?.toString();
 

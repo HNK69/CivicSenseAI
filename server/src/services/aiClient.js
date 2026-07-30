@@ -145,6 +145,23 @@ async function copilotChat({
   officer_department,
   complaint_context = {},
 }) {
+  const formatComplaintSummary = (c) => {
+    if (!c) return null;
+    const cid = (c.complaint_id || c.id || c._id)?.toString();
+    if (!cid) return null;
+    return {
+      complaint_id: cid,
+      text: c.text || [c.title, c.description].filter(Boolean).join(' - ') || 'Civic issue',
+      category: c.category || 'Other',
+      severity: c.severity || c.priority || c.ai_analysis?.severity || null,
+      status: c.status || null,
+      created_at: c.created_at || (c.createdAt ? new Date(c.createdAt).toISOString() : null),
+    };
+  };
+
+  const rawRecent = complaint_context?.recent_complaints || (complaint_context?.id ? [complaint_context] : []);
+  const recent_complaints = rawRecent.map(formatComplaintSummary).filter(Boolean);
+
   return callWithRetry(
     () =>
       _client.post('/api/v1/copilot', {
@@ -153,9 +170,9 @@ async function copilotChat({
           officer_id: officer_id || 'guest_officer',
           officer_name: officer_name || 'Officer',
           officer_department: officer_department || 'General',
-          recent_complaints: complaint_context?.recent_complaints || (complaint_context?.id ? [complaint_context] : []),
-          backlog: complaint_context?.backlog || [],
-          priority_queue: complaint_context?.priority_queue || [],
+          recent_complaints,
+          backlog: (complaint_context?.backlog || []).map(formatComplaintSummary).filter(Boolean),
+          priority_queue: (complaint_context?.priority_queue || []).map(formatComplaintSummary).filter(Boolean),
         },
       }),
     'copilotChat'

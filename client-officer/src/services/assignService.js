@@ -7,11 +7,11 @@ const MOCK_WORK_ORDERS = [
   { _id: 'wo-004', issueId: 'iss-005', issueTitle: 'Fallen tree blocking road',  department: 'ROADS',  assignedTo: 'Abdul Wahab',    status: 'IN_PROGRESS', dueDate: '2025-07-30' },
 ];
 
-/** GET all work orders */
+/** GET all work orders (CRIT-1 fix: /officer/work-orders) */
 export async function getWorkOrders() {
   try {
-    const res = await api.get('/work-orders');
-    const docs = res?.data?.docs || res?.docs || res?.workOrders || res;
+    const res = await api.get('/officer/work-orders');
+    const docs = res?.data?.docs || res?.data || res?.docs || res?.workOrders || res;
     if (Array.isArray(docs) && docs.length > 0) return docs;
     return MOCK_WORK_ORDERS;
   } catch (err) {
@@ -31,10 +31,10 @@ export async function assignWorkOrder(issueId, department, officerId) {
   }
 }
 
-/** PATCH update work order status */
+/** PATCH update work order status (CRIT-2 fix: /officer/work-orders/:id) */
 export async function updateWorkOrderStatus(id, status) {
   try {
-    const res = await api.patch(`/work-orders/${id}/status`, { status });
+    const res = await api.patch(`/officer/work-orders/${id}`, { status });
     return res?.data || res;
   } catch (err) {
     console.warn('[assignService] Failed to update work order status:', err.message);

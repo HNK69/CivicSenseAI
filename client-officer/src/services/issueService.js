@@ -12,7 +12,7 @@ const MOCK_ISSUES = [
 export async function getIssues() {
   try {
     const res = await api.get('/officer/issues');
-    const docs = res?.data?.docs || res?.docs || res?.issues || res;
+    const docs = res?.data?.docs || res?.data || res?.docs || res?.issues || res;
     if (Array.isArray(docs) && docs.length > 0) return docs;
     return MOCK_ISSUES;
   } catch (err) {

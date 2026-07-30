@@ -8,11 +8,11 @@ let MOCK_CONTRACTORS = [
   { _id: 'con-005', name: 'GreenThumb Parks Co',  category: 'Parks',       rating: 4.0, completedJobs: 11, complaints: 1, flagged: false, flagStatus: 'Active',      lastActive: '2025-07-26' },
 ];
 
-/** GET all contractors */
+/** GET all contractors (CRIT-4 fix: /officer/contractors) */
 export async function getContractors() {
   try {
-    const res = await api.get('/contractors');
-    const contractors = res?.data?.contractors || res?.data?.docs || res?.contractors || res;
+    const res = await api.get('/officer/contractors');
+    const contractors = res?.data?.contractors || res?.data?.docs || res?.data || res?.contractors || res;
     if (Array.isArray(contractors) && contractors.length > 0) return contractors;
     return MOCK_CONTRACTORS;
   } catch (err) {
@@ -21,10 +21,10 @@ export async function getContractors() {
   }
 }
 
-/** POST flag a contractor */
+/** POST flag a contractor (CRIT-4 fix: /officer/contractors/:id/flag) */
 export async function flagContractor(id) {
   try {
-    const res = await api.post(`/contractors/${id}/flag`);
+    const res = await api.post(`/officer/contractors/${id}/flag`);
     return res?.data || res;
   } catch (err) {
     console.warn('[contractorService] Failed to flag contractor:', err.message);
@@ -35,10 +35,10 @@ export async function flagContractor(id) {
   }
 }
 
-/** DELETE unflag a contractor */
+/** DELETE unflag a contractor (CRIT-4 fix: /officer/contractors/:id/flag) */
 export async function unflagContractor(id) {
   try {
-    const res = await api.delete(`/contractors/${id}/flag`);
+    const res = await api.delete(`/officer/contractors/${id}/flag`);
     return res?.data || res;
   } catch (err) {
     console.warn('[contractorService] Failed to unflag contractor:', err.message);
@@ -49,10 +49,10 @@ export async function unflagContractor(id) {
   }
 }
 
-/** PUT update flag status of a contractor (Active, Under Warning, Flagged, Blacklisted) */
+/** PUT update flag status of a contractor (CRIT-4 fix: /officer/contractors/:id/flag-status) */
 export async function updateFlagStatus(id, flagStatus) {
   try {
-    const res = await api.put(`/contractors/${id}/flag-status`, { flagStatus });
+    const res = await api.put(`/officer/contractors/${id}/flag-status`, { flagStatus });
     return res?.data || res;
   } catch (err) {
     console.warn('[contractorService] Failed to update flag status:', err.message);

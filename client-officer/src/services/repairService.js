@@ -24,11 +24,11 @@ const MOCK_REPAIRS = [
   },
 ];
 
-/** GET all repair verification records */
+/** GET all repair verification records (CRIT-3 fix: /officer/repairs) */
 export async function getRepairs() {
   try {
-    const res = await api.get('/work-orders/repairs');
-    const docs = res?.data?.repairs || res?.data?.docs || res?.repairs || res?.docs || res;
+    const res = await api.get('/officer/repairs');
+    const docs = res?.data?.repairs || res?.data?.docs || res?.data || res?.repairs || res?.docs || res;
     if (Array.isArray(docs) && docs.length > 0) return docs;
     return MOCK_REPAIRS;
   } catch (err) {

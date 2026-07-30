@@ -27,6 +27,14 @@ const DEPT_MAP = {
   Other:       'General',
 };
 
+const CATEGORY_MAP = {
+  ROAD: 'Roads', WATER: 'Water', ELECTRICITY: 'Electricity',
+  WASTE: 'Sanitation', DRAINAGE: 'Other', NOISE: 'Other',
+  PUBLIC_SAFETY: 'Other', OTHER: 'Other',
+  Roads: 'Roads', Water: 'Water', Electricity: 'Electricity',
+  Sanitation: 'Sanitation', Parks: 'Parks', Other: 'Other',
+};
+
 const PRIORITY_MAP = {
   P1: 'CRITICAL', P2: 'HIGH', P3: 'MEDIUM', P4: 'LOW',
   CRITICAL: 'CRITICAL', HIGH: 'HIGH', MEDIUM: 'MEDIUM', LOW: 'LOW',
@@ -83,8 +91,8 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
     // Non-fatal — proceed with user-supplied category
   }
 
-  // Use AI category if provided, else fall back to user-submitted
-  const resolvedCategory = aiAnalysis?.category || category;
+  // IMP-5 fix: Map AI category to Mongoose enum values (Roads, Water, Electricity, Sanitation, Parks, Other)
+  const resolvedCategory = CATEGORY_MAP[aiAnalysis?.category] || CATEGORY_MAP[category] || category || 'Other';
 
   // Build departments[] from AI result — always iterate the array (spec §5)
   let departments = aiAnalysis?.departments?.length
@@ -705,7 +713,7 @@ exports.officerInvestigate = asyncHandler(async (req, res) => {
       media_failed:       result.media_failed || [],
       analyzed_at:        new Date(),
     };
-    if (result.priority) issue.priority = result.priority;
+    if (result.priority) issue.priority = PRIORITY_MAP[result.priority] || result.priority;
     await issue.save({ validateBeforeSave: false });
   } catch (aiErr) {
     return error(res, `AI investigation failed: ${aiErr.message}`, 502);
