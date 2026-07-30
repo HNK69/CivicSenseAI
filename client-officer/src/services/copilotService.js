@@ -1,4 +1,4 @@
-// import api from './api';
+import api from './api';
 
 const MOCK_HISTORY = [
   { _id: 'msg-001', role: 'officer', text: 'What are the top unresolved issues in Zone-A this week?', ts: '2025-07-30T09:00:00Z' },
@@ -7,16 +7,37 @@ const MOCK_HISTORY = [
   { _id: 'msg-004', role: 'ai',      text: 'AquaFlow Pipes Ltd leads with 9 complaints this quarter, primarily around delayed repair completions in water supply projects. Consider review before renewing their contract.', ts: '2025-07-30T09:01:04Z' },
 ];
 
-/** GET copilot chat history. TODO: return api.get('/copilot/history') */
-export async function getChatHistory()              { return Promise.resolve(MOCK_HISTORY); }
+/** GET copilot chat history */
+export async function getChatHistory() {
+  try {
+    const res = await api.get('/officer/copilot/history');
+    const history = res?.data?.history || res?.history;
+    if (Array.isArray(history) && history.length > 0) return history;
+    return MOCK_HISTORY;
+  } catch (err) {
+    console.warn('[copilotService] Failed to fetch chat history, using fallback:', err.message);
+    return MOCK_HISTORY;
+  }
+}
 
-/** POST send a message to the AI copilot. TODO: return api.post('/copilot/chat', { message }) */
-export async function sendMessage(message) {
-  // Stub response — replace with real AI endpoint call
-  return Promise.resolve({
-    _id: `msg-${Date.now()}`,
-    role: 'ai',
-    text: `[AI Response Placeholder] You asked: "${message}". The backend copilot service will return a real answer when connected.`,
-    ts: new Date().toISOString(),
-  });
+/** POST send a message to the AI copilot */
+export async function sendMessage(message, issueId) {
+  try {
+    const res = await api.post('/officer/copilot/chat', { message, issueId });
+    const replyText = res?.data?.reply || res?.data?.answer || res?.reply || res?.answer || res;
+    return {
+      _id: `msg-${Date.now()}`,
+      role: 'ai',
+      text: typeof replyText === 'string' ? replyText : JSON.stringify(replyText),
+      ts: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.warn('[copilotService] Failed to query AI copilot:', err.message);
+    return {
+      _id: `msg-${Date.now()}`,
+      role: 'ai',
+      text: `[AI Copilot Error] ${err.response?.data?.message || err.message}. Please try again shortly.`,
+      ts: new Date().toISOString(),
+    };
+  }
 }

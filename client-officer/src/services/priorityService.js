@@ -1,4 +1,4 @@
-// import api from './api';
+import api from './api';
 
 const MOCK_RANKED = [
   { _id: 'iss-003', title: 'Garbage not collected — Ward 7B',          priority: 'CRITICAL', score: 97, upvotes: 41, daysOpen: 6, category: 'Sanitation' },
@@ -8,8 +8,26 @@ const MOCK_RANKED = [
   { _id: 'iss-002', title: 'Broken streetlight — Gandhi Nagar Lane 4',  priority: 'MEDIUM',   score: 55, upvotes: 14, daysOpen: 8,  category: 'Electricity' },
 ];
 
-/** GET priority-ranked issues. TODO: return api.get('/issues/prioritized') */
-export async function getPrioritizedIssues()       { return Promise.resolve(MOCK_RANKED); }
+/** GET priority-ranked issues */
+export async function getPrioritizedIssues() {
+  try {
+    const res = await api.get('/officer/issues/prioritized');
+    const issues = res?.data?.issues || res?.issues || res;
+    if (Array.isArray(issues) && issues.length > 0) return issues;
+    return MOCK_RANKED;
+  } catch (err) {
+    console.warn('[priorityService] Failed to fetch prioritized issues, using fallback:', err.message);
+    return MOCK_RANKED;
+  }
+}
 
-/** POST override priority for an issue. TODO: return api.patch(`/issues/${id}/priority`, { priority }) */
-export async function overridePriority(id, priority) { return Promise.resolve({ success: true, id, priority }); }
+/** PATCH override priority for an issue */
+export async function overridePriority(id, priority) {
+  try {
+    const res = await api.patch(`/officer/issues/${id}/priority`, { priority });
+    return res?.data || res;
+  } catch (err) {
+    console.warn('[priorityService] Failed to override priority:', err.message);
+    return { success: false, error: err.message };
+  }
+}

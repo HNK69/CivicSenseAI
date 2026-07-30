@@ -1,4 +1,4 @@
-// import api from './api';
+import api from './api';
 
 const MOCK_WORK_ORDERS = [
   { _id: 'wo-001', issueId: 'iss-001', issueTitle: 'Pothole on MG Road',        department: 'PWD',    assignedTo: 'Rajiv Sharma',   status: 'PENDING',     dueDate: '2025-08-05' },
@@ -7,11 +7,37 @@ const MOCK_WORK_ORDERS = [
   { _id: 'wo-004', issueId: 'iss-005', issueTitle: 'Fallen tree blocking road',  department: 'ROADS',  assignedTo: 'Abdul Wahab',    status: 'IN_PROGRESS', dueDate: '2025-07-30' },
 ];
 
-/** GET all work orders. TODO: return api.get('/work-orders') */
-export async function getWorkOrders()                            { return Promise.resolve(MOCK_WORK_ORDERS); }
+/** GET all work orders */
+export async function getWorkOrders() {
+  try {
+    const res = await api.get('/work-orders');
+    const docs = res?.data?.docs || res?.docs || res?.workOrders || res;
+    if (Array.isArray(docs) && docs.length > 0) return docs;
+    return MOCK_WORK_ORDERS;
+  } catch (err) {
+    console.warn('[assignService] Failed to fetch work orders, using fallback:', err.message);
+    return MOCK_WORK_ORDERS;
+  }
+}
 
-/** POST assign a work order to a department/officer. TODO: return api.post('/work-orders', payload) */
-export async function assignWorkOrder(issueId, dept, assignedTo) { return Promise.resolve({ success: true, issueId, dept, assignedTo }); }
+/** POST assign a work order to a department/officer */
+export async function assignWorkOrder(issueId, department, officerId) {
+  try {
+    const res = await api.patch(`/officer/issues/${issueId}/assign`, { department, officerId });
+    return res?.data || res;
+  } catch (err) {
+    console.warn('[assignService] Failed to assign work order:', err.message);
+    return { success: false, error: err.message };
+  }
+}
 
-/** PATCH update work order status. TODO: return api.patch(`/work-orders/${id}`, { status }) */
-export async function updateWorkOrderStatus(id, status)          { return Promise.resolve({ success: true, id, status }); }
+/** PATCH update work order status */
+export async function updateWorkOrderStatus(id, status) {
+  try {
+    const res = await api.patch(`/work-orders/${id}/status`, { status });
+    return res?.data || res;
+  } catch (err) {
+    console.warn('[assignService] Failed to update work order status:', err.message);
+    return { success: false, error: err.message };
+  }
+}

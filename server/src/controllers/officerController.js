@@ -332,10 +332,14 @@ exports.verifyRepairOfficer = asyncHandler(async (req, res) => {
   const wo = await WorkOrder.findById(req.params.id).populate('issue');
   if (!wo) return error(res, 'Work order not found', 404);
 
-  // ---- Build image URL arrays for AI service ----
-  const before_image_urls = wo.before_image_urls?.length
+  // ---- Build image URL arrays for AI service (C6 fix: fallback to issue images if empty) ----
+  let before_image_urls = wo.before_image_urls?.length
     ? wo.before_image_urls
     : [wo.beforeImage?.url].filter(Boolean);
+
+  if (before_image_urls.length === 0 && wo.issue?.images?.length) {
+    before_image_urls = wo.issue.images.map(img => img.url).filter(Boolean);
+  }
 
   const after_image_urls = wo.after_image_urls?.length
     ? wo.after_image_urls
@@ -360,12 +364,17 @@ exports.verifyRepairOfficer = asyncHandler(async (req, res) => {
   const lowConfidence = aiResult?.confidence !== undefined && aiResult.confidence !== null &&
                         aiResult.confidence < 0.6;
 
+  // R5 fix: wrap remaining_issues in array if string
+  const remainingIssuesArr = typeof aiResult?.remaining_issues === 'string'
+    ? [aiResult.remaining_issues]
+    : aiResult?.remaining_issues || [];
+
   // Persist AI result on work order
   wo.ai_repair_verification = aiResult ? {
     verified:         aiResult.verified ?? null,
     confidence:       aiResult.confidence ?? null,
     explanation:      aiResult.explanation || null,
-    remaining_issues: aiResult.remaining_issues || [],
+    remaining_issues: remainingIssuesArr,
     diff_summary:     aiResult.diff_summary || null,
     verified_at:      new Date(),
   } : null;
@@ -434,7 +443,7 @@ exports.verifyRepairOfficer = asyncHandler(async (req, res) => {
       aiVerified:      false,
       confidence:      aiResult?.confidence ?? null,
       explanation:     aiResult?.explanation || aiError || null,
-      remaining_issues: aiResult?.remaining_issues || [],
+      remaining_issues: remainingIssuesArr,
       lowConfidence,
       message:         'Repair not verified. Issue remains open. See remaining_issues for details.',
     }, 'Repair verification failed — issue remains open');
@@ -443,7 +452,7 @@ exports.verifyRepairOfficer = asyncHandler(async (req, res) => {
 
 /* ====================================================================
    DASHBOARD STATS
-   Supports client-officer's Dashboard.jsx stat strip (hardcoded currently).
+   Supports client-officer's Dashboard.jsx stat strip.
    ==================================================================== */
 
 /**
@@ -475,8 +484,21 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     WorkOrder.countDocuments({ status: { $in: ['pending', 'in_progress'] } }),
     WorkOrder.countDocuments({ verificationVerdict: null, status: 'completed' }),
     Contractor.countDocuments({ flagged: true }),
-    Issue.countDocuments({ 'aiMeta.summary': { $ne: null }, isDeleted: false }),
-    Issue.countDocuments({ 'aiMeta.duplicateOf': { $ne: null }, isDeleted: false }),
+    // R2 fix: check both ai_analysis.summary and aiMeta.summary
+    Issue.countDocuments({
+      $or: [
+        { 'ai_analysis.summary': { $ne: null } },
+        { 'aiMeta.summary': { $ne: null } },
+      ],
+      isDeleted: false,
+    }),
+    Issue.countDocuments({
+      $or: [
+        { 'duplicate_check.is_duplicate': true },
+        { 'aiMeta.duplicateOf': { $ne: null } },
+      ],
+      isDeleted: false,
+    }),
   ]);
 
   return success(res, {
@@ -494,7 +516,7 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
 });
 
 /* ====================================================================
-   COPILOT (stub)
+   COPILOT
    Supports client-officer's copilotService:
      getChatHistory()  → GET  /api/officer/copilot/history
      sendMessage()     → POST /api/officer/copilot/chat
@@ -504,7 +526,6 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
  * GET /api/officer/copilot/history
  */
 exports.getCopilotHistory = asyncHandler(async (req, res) => {
-  // TODO: persist copilot messages in a CopilotMessage model
   return success(res, { history: [] });
 });
 
@@ -549,9 +570,9 @@ exports.sendCopilotMessage = asyncHandler(async (req, res) => {
   try {
     reply = await municipalCopilotQuery({
       message,
-      officer_id:         req.officer._id.toString(),
-      officer_name:       req.officer.name,
-      officer_department: req.officer.department,
+      officer_id:         req.officer?._id?.toString() || 'officer_guest',
+      officer_name:       req.officer?.name || 'Officer',
+      officer_department: req.officer?.department || 'General',
       complaint_context,
       tools:              [],
     });
@@ -562,7 +583,12 @@ exports.sendCopilotMessage = asyncHandler(async (req, res) => {
     throw aiErr;
   }
 
-  return success(res, { reply: reply?.response || reply, complaint_context });
+  // C2 fix: read reply?.answer || reply?.response || reply
+  const answerText = typeof reply === 'string'
+    ? reply
+    : (reply?.answer || reply?.response || JSON.stringify(reply));
+
+  return success(res, { reply: answerText, answer: answerText, complaint_context });
 });
 
 /* ====================================================================

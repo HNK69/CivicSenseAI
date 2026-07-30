@@ -27,6 +27,11 @@ const DEPT_MAP = {
   Other:       'General',
 };
 
+const PRIORITY_MAP = {
+  P1: 'CRITICAL', P2: 'HIGH', P3: 'MEDIUM', P4: 'LOW',
+  CRITICAL: 'CRITICAL', HIGH: 'HIGH', MEDIUM: 'MEDIUM', LOW: 'LOW',
+};
+
 /**
  * Deduplicate an array of strings.
  */
@@ -42,8 +47,8 @@ const unique = (arr) => [...new Set(arr.filter(Boolean))];
  *
  * AI flow (MUST follow this order per spec):
  *  1. Call /analyze  → get category, departments[], priority, summary, etc.
- *  2. Call /check-duplicate (needs category from step 1, BEFORE saving to Mongo)
- *  3a. If is_duplicate → do NOT save, link citizen to duplicate_of
+ *  2. Call /detect-duplicates (needs category from step 1, BEFORE saving to Mongo)
+ *  3a. If isDuplicate → do NOT save, link citizen to duplicateOf
  *  3b. If not duplicate → save, then create one WorkOrder per department in departments[]
  */
 exports.citizenCreateIssue = asyncHandler(async (req, res) => {
@@ -72,7 +77,7 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
   let aiAnalysis = null;
   try {
     aiAnalysis = await analyzeIssue({ text: fullText, image_urls, video_urls, gps });
-    console.log(`[issueController] analyzeComplaint done: category=${aiAnalysis?.category}`);
+    console.log(`[issueController] analyzeComplaint done: category=${aiAnalysis?.category}, priority=${aiAnalysis?.priority}`);
   } catch (aiErr) {
     console.error('[issueController] analyzeComplaint failed:', aiErr.message);
     // Non-fatal — proceed with user-supplied category
@@ -91,13 +96,11 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
   // Ensure primary_department is in departments[] with no duplicates
   departments = unique([primaryDepartment, ...departments]);
 
-  // Priority from AI, or fall back to 'LOW'
-  const resolvedPriority = aiAnalysis?.priority || 'LOW';
+  // Priority mapping (R6 fix: map P1->CRITICAL, P2->HIGH, P3->MEDIUM, P4->LOW)
+  const resolvedPriority = PRIORITY_MAP[aiAnalysis?.priority] || 'LOW';
   const assignedDepartment = primaryDepartment;
 
   /* ---- Step 2: checkDuplicate (BEFORE saving to MongoDB) ---- */
-  // We need a temporary ID to pass to the AI service. We'll use a new ObjectId
-  // for the complaint_id parameter; we'll only save if not duplicate.
   const tempId = new mongoose.Types.ObjectId();
 
   let duplicateResult = null;
@@ -107,18 +110,23 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
       text:         fullText,
       category:     resolvedCategory,
     });
-    console.log(`[issueController] checkDuplicate done: is_duplicate=${duplicateResult?.is_duplicate}`);
+    console.log(`[issueController] checkDuplicate done:`, duplicateResult);
   } catch (dupErr) {
     console.error('[issueController] checkDuplicate failed:', dupErr.message);
     // Non-fatal — proceed as not-duplicate
   }
 
+  // C4 Fix: handle both camelCase (isDuplicate, duplicateOf) and snake_case
+  const isDup = duplicateResult?.isDuplicate === true || duplicateResult?.is_duplicate === true;
+  const dupOf = duplicateResult?.duplicateOf || duplicateResult?.duplicate_of;
+  const simScore = duplicateResult?.similarityScore ?? duplicateResult?.similarity_score;
+
   /* ---- Step 3a: Duplicate — do NOT save, return link ---- */
-  if (duplicateResult?.is_duplicate === true) {
+  if (isDup) {
     return success(res, {
       isDuplicate:  true,
-      duplicate_of: duplicateResult.duplicate_of,
-      similarity:   duplicateResult.similarity_score,
+      duplicate_of: dupOf,
+      similarity:   simScore,
       message:      'A similar issue has already been reported. Your report has been linked to it.',
     }, 'Duplicate issue detected');
   }
@@ -149,7 +157,7 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
     ai_analysis: aiAnalysis ? {
       category:           aiAnalysis.category || null,
       severity:           aiAnalysis.severity || null,
-      priority:           aiAnalysis.priority || null,
+      priority:           resolvedPriority,
       primary_department: primaryDepartment,
       departments,
       department:         primaryDepartment, // alias for back-compat
@@ -164,9 +172,9 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
 
     // Persist duplicate check result
     duplicate_check: duplicateResult ? {
-      is_duplicate:         duplicateResult.is_duplicate ?? false,
-      duplicate_of:         duplicateResult.duplicate_of || null,
-      similarity_score:     duplicateResult.similarity_score ?? null,
+      is_duplicate:         isDup,
+      duplicate_of:         dupOf || null,
+      similarity_score:     simScore ?? null,
       confidence:           duplicateResult.confidence ?? null,
       candidates_evaluated: duplicateResult.candidates_evaluated ?? null,
       checked_at:           new Date(),
@@ -177,7 +185,7 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
       analysisTags:    aiAnalysis?.analysisTags || [],
       summary:         aiAnalysis?.summary || null,
       suggestedAction: null,
-      duplicateOf:     null,
+      duplicateOf:     dupOf || null,
       confidence:      aiAnalysis?.confidence ?? null,
     },
   });

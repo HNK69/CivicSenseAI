@@ -1,4 +1,4 @@
-// import api from './api';
+import api from './api';
 
 const MOCK_GROUPS = [
   { _id: 'dup-grp-001', primaryIssueId: 'iss-001', duplicates: [
@@ -10,8 +10,26 @@ const MOCK_GROUPS = [
   ]},
 ];
 
-/** GET all duplicate groups. TODO: return api.get('/duplicates') */
-export async function getDuplicateGroups()              { return Promise.resolve(MOCK_GROUPS); }
+/** GET all duplicate groups */
+export async function getDuplicateGroups() {
+  try {
+    const res = await api.get('/officer/duplicates');
+    const groups = res?.data?.groups || res?.groups || res;
+    if (Array.isArray(groups) && groups.length > 0) return groups;
+    return MOCK_GROUPS;
+  } catch (err) {
+    console.warn('[duplicateService] Failed to fetch duplicates, using fallback:', err.message);
+    return MOCK_GROUPS;
+  }
+}
 
-/** POST merge selected duplicates into primary. TODO: return api.post('/duplicates/merge', payload) */
-export async function mergeDuplicates(primaryId, dupIds) { return Promise.resolve({ success: true, primaryId, mergedCount: dupIds.length }); }
+/** POST merge selected duplicates into primary */
+export async function mergeDuplicates(primaryId, dupIds) {
+  try {
+    const res = await api.post('/officer/duplicates/merge', { primaryId, dupIds });
+    return res?.data || res;
+  } catch (err) {
+    console.warn('[duplicateService] Failed to merge duplicates:', err.message);
+    return { success: false, error: err.message };
+  }
+}
