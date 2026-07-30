@@ -4,6 +4,8 @@ const app  = require('./app');
 const connectDB  = require('./config/db');
 const { initSocket } = require('./config/socket');
 const { initSocketHandler } = require('./sockets/socketHandler');
+const { startCleanupJob } = require('./services/cleanupService');
+
 
 const PORT = process.env.PORT || 5000;
 
@@ -17,7 +19,10 @@ const start = async () => {
   // 1. Connect to MongoDB (exits on failure after retries)
   await connectDB();
 
-  // 2. Start HTTP server
+  // 2. Start scheduled jobs
+  startCleanupJob();
+
+  // 3. Start HTTP server
   httpServer.listen(PORT, () => {
     console.log(`
 ╔══════════════════════════════════════════════════╗
