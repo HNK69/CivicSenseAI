@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Badge, Spinner, Alert } from 'react-bootstrap';
+import { motion } from 'framer-motion';
 import FeatureCard from '../components/FeatureCard.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import NotificationItem from '../components/NotificationItem.jsx';
@@ -10,6 +11,15 @@ import { getMyIssues } from '../services/issueService.js';
 import { getPendingVerifications } from '../services/verifyService.js';
 import { categoryIconMap } from '../utils/statusColorMap.js';
 import { timeAgo } from '../utils/formatDate.js';
+
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.06 } },
+};
+const cardVariants = {
+  hidden:  { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.22, ease: 'easeOut' } },
+};
 
 /**
  * Dashboard.jsx — Main citizen landing page.
@@ -30,14 +40,14 @@ const Dashboard = () => {
   return (
     <>
       {/* ---- Hero strip ---- */}
-      <div className="page-hero" style={{ paddingTop: 'calc(64px + 2rem)' }}>
+      <div className="page-hero">
         <Container>
           <div className="d-flex align-items-center gap-3 flex-wrap">
             <div>
-              <h1 className="mb-1" style={{ fontSize: '1.7rem' }}>
+              <h1 className="mb-1">
                 Welcome back, {user?.name?.split(' ')[0] ?? 'Citizen'} 👋
               </h1>
-              <p className="mb-0" style={{ opacity: .8 }}>
+              <p className="mb-0">
                 {user?.ward} · {user?.city} &nbsp;·&nbsp; Report. Track. Verify.
               </p>
             </div>
@@ -46,11 +56,16 @@ const Dashboard = () => {
       </div>
 
       {/* ---- Cards grid ---- */}
-      <Container className="py-5">
-        <Row className="g-4">
+      <Container className="py-4">
+        <motion.div
+          className="row g-4"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
 
           {/* ---- Card 1: Report Issue ---- */}
-          <Col xs={12} md={6} lg={4}>
+          <motion.div variants={cardVariants} className="col-12 col-md-6 col-lg-4">
             <FeatureCard
               icon="bi-camera-fill"
               iconClass="ci-blue"
@@ -59,7 +74,7 @@ const Dashboard = () => {
               actionLabel="Report New Issue"
               onAction={() => navigate('/report')}
             />
-          </Col>
+          </motion.div>
 
           {/* ---- Card 2: Track Status ---- */}
           <Col xs={12} md={6} lg={4}>
@@ -227,7 +242,7 @@ const Dashboard = () => {
             </FeatureCard>
           </Col>
 
-        </Row>
+        </motion.div>
       </Container>
     </>
   );

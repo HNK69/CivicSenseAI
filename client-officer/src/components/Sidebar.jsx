@@ -38,7 +38,7 @@ function Sidebar() {
       {/* Footer info */}
       <div className="mt-auto px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '16px' }}>
         <small style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72rem' }}>
-          Smart Civic Reporter v1.0
+          CivicSense AI v1.0
         </small>
       </div>
     </nav>

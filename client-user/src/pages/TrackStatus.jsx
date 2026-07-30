@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Container, Card, Table, Badge, Spinner, Button, ButtonGroup, Form, InputGroup } from 'react-bootstrap';
 import StatusBadge from '../components/StatusBadge.jsx';
 import useFetch from '../hooks/useFetch.js';

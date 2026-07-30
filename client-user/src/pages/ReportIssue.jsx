@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Alert, Toast, ToastContainer } from 'react-bootstrap';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Container, Row, Col, Card, Alert } from 'react-bootstrap';
 import IssueUploadForm from '../components/IssueUploadForm.jsx';
 import { reportIssue } from '../services/issueService.js';
 import BackButton from '../components/BackButton.jsx';
@@ -48,60 +49,70 @@ const ReportIssue = () => {
 
       <Container className="py-5" style={{ maxWidth: 720 }}>
 
-        {/* Floating Success Toast Overlay at screen top */}
-        {success && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '80px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 9999,
-              minWidth: '340px',
-              maxWidth: '90vw',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
-              borderRadius: '12px',
-              overflow: 'hidden',
-            }}
-          >
-            <Alert
-              variant="success"
-              dismissible
-              onClose={() => navigate('/status')}
-              className="mb-0 shadow-lg border-0"
-              style={{ background: '#10b981', color: '#fff' }}
+        <AnimatePresence>
+          {success && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              style={{
+                position: 'fixed',
+                top: '80px',
+                left: '50%',
+                x: '-50%',
+                zIndex: 9999,
+                minWidth: '340px',
+                maxWidth: '90vw',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.22)',
+              }}
             >
-              <div className="d-flex align-items-center gap-2">
-                <i className="bi bi-check-circle-fill fs-5" />
-                <div>
-                  <strong>Issue Submitted Successfully!</strong>
-                  <div style={{ fontSize: '.84rem', opacity: 0.95 }}>
-                    Report ID: <strong>{issueId}</strong>. Redirecting to Track Status…
+              <Alert
+                variant="success"
+                dismissible
+                onClose={() => navigate('/status')}
+                className="mb-0 border-0"
+                style={{ background: '#10b981', color: '#fff' }}
+              >
+                <div className="d-flex align-items-center gap-2">
+                  <i className="bi bi-check-circle-fill fs-5" />
+                  <div>
+                    <strong>Issue Submitted Successfully!</strong>
+                    <div style={{ fontSize: '.84rem', opacity: 0.95 }}>
+                      Report ID: <strong>{issueId}</strong>. Redirecting to Track Status…
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Alert>
-          </div>
-        )}
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Floating Error Alert at screen top */}
-        {error && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '80px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 9999,
-              minWidth: '320px',
-              maxWidth: '90vw',
-            }}
-          >
-            <Alert variant="danger" dismissible onClose={() => setError('')} className="shadow-lg border-0">
-              <i className="bi bi-exclamation-circle-fill me-2" />{error}
-            </Alert>
-          </div>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              style={{
+                position: 'fixed',
+                top: '80px',
+                left: '50%',
+                x: '-50%',
+                zIndex: 9999,
+                minWidth: '320px',
+                maxWidth: '90vw',
+              }}
+            >
+              <Alert variant="danger" dismissible onClose={() => setError('')} className="shadow-lg border-0">
+                <i className="bi bi-exclamation-circle-fill me-2" />{error}
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <Row>
           {/* ---- Form card ---- */}
