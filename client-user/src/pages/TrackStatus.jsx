@@ -13,10 +13,21 @@ import BackButton from '../components/BackButton.jsx';
  */
 const FILTERS = [
   { key: 'all',         label: 'All',         variant: 'outline-secondary' },
-  { key: 'pending',     label: 'Pending',      variant: 'outline-warning'   },
-  { key: 'in-progress', label: 'In Progress',  variant: 'outline-info'      },
-  { key: 'completed',   label: 'Completed',    variant: 'outline-success'   },
+  { key: 'reported',    label: 'Pending',      variant: 'outline-warning'   },
+  { key: 'in_progress', label: 'In Progress',  variant: 'outline-info'      },
+  { key: 'resolved',    label: 'Completed',    variant: 'outline-success'   },
 ];
+
+// Normalise backend status to a display label
+const STATUS_LABEL = {
+  reported:     'Reported',
+  acknowledged: 'Acknowledged',
+  assigned:     'Assigned',
+  in_progress:  'In Progress',
+  resolved:     'Resolved',
+  rejected:     'Rejected',
+  reopened:     'Reopened',
+};
 
 const TrackStatus = () => {
   const [activeFilter, setActiveFilter] = useState('all');
@@ -27,10 +38,11 @@ const TrackStatus = () => {
   const filtered = (issues || []).filter(issue => {
     const matchesFilter =
       activeFilter === 'all' || issue.status === activeFilter;
+    const issueId = issue._id || issue.id || '';
     const matchesSearch =
       search === '' ||
-      issue.title.toLowerCase().includes(search.toLowerCase()) ||
-      issue.id.toLowerCase().includes(search.toLowerCase());
+      (issue.title || '').toLowerCase().includes(search.toLowerCase()) ||
+      issueId.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -125,39 +137,45 @@ const TrackStatus = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(issue => (
-                      <tr
-                        key={issue.id}
-                        className="report-row"
-                        data-status={issue.status}
-                        id={`row-${issue.id}`}
-                      >
-                        <td>
-                          <span className="badge bg-light text-dark fw-semibold" style={{ fontSize: '.75rem' }}>
-                            {issue.id}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="fw-semibold" style={{ fontSize: '.875rem' }}>{issue.title}</div>
-                          <div className="text-muted" style={{ fontSize: '.75rem' }}>
-                            <i className="bi bi-geo-alt-fill text-danger me-1" />
-                            {issue.location?.address || '—'}
-                          </div>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: '.82rem', color: '#64748b' }}>
-                            <i className={`bi ${categoryIconMap[issue.category] ?? 'bi-three-dots'} me-1`} />
-                            {issue.category?.charAt(0).toUpperCase() + issue.category?.slice(1)}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ fontSize: '.82rem' }}>{formatDate(issue.createdAt)}</div>
-                          <div className="text-muted" style={{ fontSize: '.72rem' }}>{timeAgo(issue.createdAt)}</div>
-                        </td>
-                        <td style={{ fontSize: '.82rem' }}>{formatDate(issue.updatedAt)}</td>
-                        <td><StatusBadge status={issue.status} /></td>
-                      </tr>
-                    ))}
+                    {filtered.map(issue => {
+                      const issueId = issue._id || issue.id;
+                      const lastUpdate = issue.updatedAt ||
+                        issue.statusHistory?.at(-1)?.changedAt ||
+                        issue.createdAt;
+                      return (
+                        <tr
+                          key={issueId}
+                          className="report-row"
+                          data-status={issue.status}
+                          id={`row-${issueId}`}
+                        >
+                          <td>
+                            <span className="badge bg-light text-dark fw-semibold" style={{ fontSize: '.75rem' }}>
+                              {String(issueId).slice(-8).toUpperCase()}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="fw-semibold" style={{ fontSize: '.875rem' }}>{issue.title}</div>
+                            <div className="text-muted" style={{ fontSize: '.75rem' }}>
+                              <i className="bi bi-geo-alt-fill text-danger me-1" />
+                              {issue.address || issue.location?.address || '—'}
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: '.82rem', color: '#64748b' }}>
+                              <i className={`bi ${categoryIconMap[issue.category?.toLowerCase()] ?? 'bi-three-dots'} me-1`} />
+                              {issue.category}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: '.82rem' }}>{formatDate(issue.createdAt)}</div>
+                            <div className="text-muted" style={{ fontSize: '.72rem' }}>{timeAgo(issue.createdAt)}</div>
+                          </td>
+                          <td style={{ fontSize: '.82rem' }}>{formatDate(lastUpdate)}</td>
+                          <td><StatusBadge status={issue.status} /></td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </Table>
               </div>
@@ -167,9 +185,9 @@ const TrackStatus = () => {
             {!loading && !error && issues && (
               <div className="d-flex flex-wrap gap-3 mt-4 pt-3 border-top" style={{ fontSize: '.8rem', color: '#64748b' }}>
                 <span><strong>{issues.length}</strong> total reports</span>
-                <span><strong>{issues.filter(i => i.status === 'pending').length}</strong> pending</span>
-                <span><strong>{issues.filter(i => i.status === 'in-progress').length}</strong> in progress</span>
-                <span><strong>{issues.filter(i => i.status === 'completed').length}</strong> completed</span>
+                <span><strong>{issues.filter(i => i.status === 'reported').length}</strong> pending</span>
+                <span><strong>{issues.filter(i => i.status === 'in_progress').length}</strong> in progress</span>
+                <span><strong>{issues.filter(i => i.status === 'resolved').length}</strong> resolved</span>
               </div>
             )}
 

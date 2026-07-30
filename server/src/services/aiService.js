@@ -93,17 +93,17 @@ const transcribeAudio = async (audioInput) => {
 
   try {
     const groq = getGroq();
+    const { toFile } = require('groq-sdk');
 
-    // Build a File object from Buffer so the SDK can upload it
+    // Use Groq SDK's toFile() helper — the only reliable way to build
+    // a multipart-compatible file object that the SDK's upload internals accept.
     let fileObj;
     if (Buffer.isBuffer(audioInput)) {
-      // Wrap buffer in a File-like object that groq-sdk accepts
-      const { File } = require('node:buffer');
-      fileObj = new File([audioInput], 'recording.webm', { type: 'audio/webm' });
+      fileObj = await toFile(audioInput, 'recording.webm', { type: 'audio/webm' });
     } else {
-      // It's a path — use fs.createReadStream via the SDK's fromPath helper
+      // It's a file path — stream it via toFile
       const fs = require('fs');
-      fileObj = fs.createReadStream(audioInput);
+      fileObj = await toFile(fs.createReadStream(audioInput), 'recording.webm', { type: 'audio/webm' });
     }
 
     const transcription = await groq.audio.transcriptions.create({
@@ -123,6 +123,7 @@ const transcribeAudio = async (audioInput) => {
     return { text: '', error: err.message };
   }
 };
+
 
 /* ---- municipalCopilotQuery ---- */
 const municipalCopilotQuery = async (query, ctx = {}) => {

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 /* =====================================================================
    Smart Civic Reporter — Officer Dashboard
    Global Theme & Layout Styles
@@ -32,7 +34,6 @@ body {
 }
 
 /* ── Google Font (Inter via import) ────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
 
 /* ── Navbar ─────────────────────────────────────────────────────────── */

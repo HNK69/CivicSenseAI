@@ -16,6 +16,7 @@ const AppRoutes = () => (
   <Routes>
     <Route element={<AppLayout />}>
       <Route path="/"              element={<Dashboard />} />
+      <Route path="/dashboard"     element={<Dashboard />} />
       <Route path="/report"        element={<ReportIssue />} />
       <Route path="/status"        element={<TrackStatus />} />
       <Route path="/verify"        element={<VerifyRepair />} />

@@ -68,12 +68,14 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
           const formData = new FormData();
           formData.append('audio', audioBlob, 'voice-recording.webm');
 
-          const token = localStorage.getItem('token');
           const res = await fetch('/api/issues/transcribe', {
             method: 'POST',
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
             body: formData,
           });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData?.message || `Server error ${res.status}`);
+          }
           const data = await res.json();
 
           // Backend wraps in { success, data: { text } }
@@ -142,11 +144,21 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
     if (Object.keys(errs).length > 0) return;
 
     const formData = new FormData();
+    // Auto-generate a title from category + first line of description
+    const autoTitle = `${category} Issue: ${description.trim().slice(0, 60)}${description.trim().length > 60 ? '…' : ''}`;
+    formData.append('title',       autoTitle);
     formData.append('description', description);
-    formData.append('category', category);
-    formData.append('latitude',  coords?.latitude  || '');
-    formData.append('longitude', coords?.longitude || '');
-    files.forEach(f => formData.append('media', f));
+    formData.append('category',    category);
+    formData.append('latitude',    coords?.latitude  || '');
+    formData.append('longitude',   coords?.longitude || '');
+    files.forEach(f => {
+      // Backend field: images for image types, videos for video types
+      if (f.type.startsWith('video/')) {
+        formData.append('videos', f);
+      } else {
+        formData.append('images', f);
+      }
+    });
 
     onSubmit?.(formData);
   };
@@ -167,12 +179,12 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
           id="issue-category-select"
         >
           <option value="">Select a category…</option>
-          <option value="roads">🚧 Roads & Potholes</option>
-          <option value="water">💧 Water Supply</option>
-          <option value="electricity">⚡ Street Lights / Electricity</option>
-          <option value="sanitation">🗑️ Garbage & Sanitation</option>
-          <option value="parks">🌳 Parks & Public Spaces</option>
-          <option value="other">📋 Other</option>
+          <option value="Roads">🚧 Roads & Potholes</option>
+          <option value="Water">💧 Water Supply</option>
+          <option value="Electricity">⚡ Street Lights / Electricity</option>
+          <option value="Sanitation">🗑️ Garbage & Sanitation</option>
+          <option value="Parks">🌳 Parks & Public Spaces</option>
+          <option value="Other">📋 Other</option>
         </Form.Select>
         <Form.Control.Feedback type="invalid">{errors.category}</Form.Control.Feedback>
       </Form.Group>
@@ -370,3 +382,4 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
 };
 
 export default IssueUploadForm;
+

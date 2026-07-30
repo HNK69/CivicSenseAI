@@ -1,15 +1,13 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 /**
- * AuthContext — Provides logged-in citizen info across the app.
- * TODO: replace MOCK_USER with real session/JWT from backend
+ * AuthContext — Simple mock user context (no JWT / no auth).
  */
-
 const MOCK_USER = {
   id: 'CIT-001',
   name: 'Aditya Kumar',
   email: 'aditya.kumar@example.com',
-  avatar: null,           // null → initials fallback
+  avatar: null,
   ward: 'Ward 42',
   city: 'Ballari',
 };
@@ -17,31 +15,10 @@ const MOCK_USER = {
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // TODO: connect to backend endpoint — GET /api/auth/me
-    // Simulate async session check
-    const timer = setTimeout(() => {
-      setUser(MOCK_USER);
-      setLoading(false);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const login = (credentials) => {
-    // TODO: POST /api/auth/login → set user from response
-    setUser(MOCK_USER);
-  };
-
-  const logout = () => {
-    // TODO: POST /api/auth/logout → clear session cookie
-    setUser(null);
-  };
+  const [user] = useState(MOCK_USER);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading: false }}>
       {children}
     </AuthContext.Provider>
   );

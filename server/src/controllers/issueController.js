@@ -9,6 +9,11 @@ const { analyzeIssue, detectDuplicate, getPriorityScore } = require('../services
 const { notifyStatusChange, notifyNewAssignment } = require('../services/notificationService');
 const { emitToIssueRoom, emitToDepartment } = require('../sockets/socketHandler');
 
+// Temporary guest ID used while auth is disabled.
+// Will be replaced by req.user._id once login/signup is built.
+const mongoose = require('mongoose');
+const GUEST_ID = new mongoose.Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaaa');
+
 /* ====================================================================
    CATEGORY → DEPARTMENT auto-routing map
    (used by both create and officer assignment)
@@ -55,7 +60,7 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
     location,
     address:            address     || null,
     assignedDepartment,
-    createdBy:          req.user._id,
+    createdBy:          GUEST_ID,
     images,
     videos,
     status:             'reported',
@@ -63,7 +68,7 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
       status:    'reported',
       changedAt: new Date(),
       changedByModel: 'User',
-      changedBy: req.user._id,
+      changedBy: GUEST_ID,
     }],
   });
 
@@ -95,7 +100,7 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
  */
 exports.citizenGetMyIssues = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 20 } = req.query;
-  const filter = { createdBy: req.user._id, isDeleted: false };
+  const filter = { isDeleted: false }; // TODO: filter by req.user._id after auth is added
   if (status) filter.status = status;
 
   const { docs, total } = await paginate(Issue, filter, {
@@ -115,7 +120,6 @@ exports.citizenGetMyIssues = asyncHandler(async (req, res) => {
 exports.citizenGetIssue = asyncHandler(async (req, res) => {
   const issue = await Issue.findOne({
     _id: req.params.id,
-    createdBy: req.user._id,
     isDeleted: false,
   }).populate('assignedOfficer', 'name designation department');
 
@@ -147,7 +151,6 @@ exports.citizenGetNearby = asyncHandler(async (req, res) => {
 exports.citizenUpdateIssue = asyncHandler(async (req, res) => {
   const issue = await Issue.findOne({
     _id: req.params.id,
-    createdBy: req.user._id,
     isDeleted: false,
   });
   if (!issue) return error(res, 'Issue not found', 404);
@@ -169,7 +172,6 @@ exports.citizenUpdateIssue = asyncHandler(async (req, res) => {
 exports.citizenDeleteIssue = asyncHandler(async (req, res) => {
   const issue = await Issue.findOne({
     _id: req.params.id,
-    createdBy: req.user._id,
   });
   if (!issue) return error(res, 'Issue not found', 404);
 
@@ -185,12 +187,12 @@ exports.citizenUpvote = asyncHandler(async (req, res) => {
   const issue = await Issue.findById(req.params.id);
   if (!issue) return error(res, 'Issue not found', 404);
 
-  const alreadyUpvoted = issue.upvotedBy.includes(req.user._id);
+  const alreadyUpvoted = issue.upvotedBy.includes(GUEST_ID);
   if (alreadyUpvoted) {
-    issue.upvotedBy.pull(req.user._id);
+    issue.upvotedBy.pull(GUEST_ID);
     issue.upvoteCount = Math.max(0, issue.upvoteCount - 1);
   } else {
-    issue.upvotedBy.push(req.user._id);
+    issue.upvotedBy.push(GUEST_ID);
     issue.upvoteCount += 1;
   }
   await issue.save();
@@ -208,7 +210,6 @@ exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
   const { confirmed, reason } = req.body;
   const issue = await Issue.findOne({
     _id: req.params.id,
-    createdBy: req.user._id,
   });
   if (!issue) return error(res, 'Issue not found', 404);
   if (issue.status !== 'resolved')
@@ -220,7 +221,7 @@ exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
       status:    'resolved',
       changedAt: new Date(),
       changedByModel: 'User',
-      changedBy: req.user._id,
+      changedBy: GUEST_ID,
       note:      'Confirmed fixed by citizen',
     });
   } else {
@@ -230,7 +231,7 @@ exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
       status:    'reopened',
       changedAt: new Date(),
       changedByModel: 'User',
-      changedBy: req.user._id,
+      changedBy: GUEST_ID,
       note:      reason || 'Still an issue — reported by citizen',
     });
     emitToIssueRoom(issue._id.toString(), 'issue:statusUpdated', {
