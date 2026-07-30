@@ -30,7 +30,7 @@ exports.citizenRegister = asyncHandler(async (req, res) => {
     name, email, phone: phone || null,
     passwordHash: password,    // pre-save hook hashes this
     ward:  ward  || null,
-    city:  city  || 'Bangalore',
+    city:  city  || 'Ballari',
   });
 
   const tokenPayload = { id: user._id, role: 'citizen', email: user.email };

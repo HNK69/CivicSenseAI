@@ -6,6 +6,8 @@ import useGeolocation from '../hooks/useGeolocation.js';
 import { getNearbyIssues } from '../services/mapService.js';
 import { categoryIconMap } from '../utils/statusColorMap.js';
 
+import { DEFAULT_COORDS } from '../utils/constants.js';
+
 /**
  * NearbyIssuesMap.jsx — Full Leaflet map of nearby reported issues.
  */
@@ -17,7 +19,7 @@ const NearbyIssuesMap = () => {
 
   const center = coords
     ? [coords.latitude, coords.longitude]
-    : [12.9716, 77.5946]; // Bangalore fallback
+    : DEFAULT_COORDS; // Ballari fallback
 
   const { data: issues, loading, error, refetch } =
     useFetch(() => getNearbyIssues(center[0], center[1], 2), [coords?.latitude]);

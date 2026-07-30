@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 
+import { DEFAULT_COORDS } from '../utils/constants.js';
+
 // Fix default Leaflet marker icons in Vite/Webpack
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -37,7 +39,7 @@ const createCustomIcon = (severity = 'medium') =>
  *  showRadius {boolean}     Draw 2 km radius circle around centre
  */
 const MapView = ({
-  center       = [12.9716, 77.5946],
+  center       = DEFAULT_COORDS,
   zoom         = 14,
   issues       = [],
   height       = '360px',

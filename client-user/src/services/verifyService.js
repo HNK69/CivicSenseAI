@@ -5,7 +5,7 @@ const MOCK_COMPLETED = [
   {
     id: 'ISS-2380',
     title: 'Overflowing garbage bin',
-    location: 'Cubbon Park, Bangalore',
+    location: 'Infantry Road, Ballari',
     completedAt: new Date(Date.now() - 86400000).toISOString(),
     beforeImg: null,
     afterImg: null,

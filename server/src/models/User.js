@@ -14,7 +14,7 @@ const userSchema = new mongoose.Schema(
     avatarUrl:     { type: String, default: null },
     address:       { type: String, default: null },
     ward:          { type: String, default: null },
-    city:          { type: String, default: 'Bangalore' },
+    city:          { type: String, default: 'Ballari' },
     role:          { type: String, enum: ['citizen'], default: 'citizen' },
 
     // Refresh tokens — stored hashed for security

@@ -11,7 +11,7 @@ const MOCK_USER = {
   email: 'aditya.kumar@example.com',
   avatar: null,           // null → initials fallback
   ward: 'Ward 42',
-  city: 'Bangalore',
+  city: 'Ballari',
 };
 
 const AuthContext = createContext(null);
