@@ -235,6 +235,10 @@ exports.createWorkOrder = asyncHandler(async (req, res) => {
  */
 exports.updateWorkOrder = asyncHandler(async (req, res) => {
   const { status, notes, contractorId, dueDate, completedAt } = req.body;
+  if (!status && !notes && !contractorId && !dueDate && !completedAt) {
+    return error(res, 'At least one field to update must be provided', 400);
+  }
+
   const wo = await WorkOrder.findById(req.params.id);
   if (!wo) return error(res, 'Work order not found', 404);
 
@@ -320,6 +324,9 @@ exports.getRepairs = asyncHandler(async (req, res) => {
  * Supports: client-officer's verifyRepair(id, verdict)
  */
 exports.verifyRepairOfficer = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
+
   const { verdict, note } = req.body;
   if (!['approved', 'rejected'].includes(verdict))
     return error(res, 'verdict must be "approved" or "rejected"', 400);

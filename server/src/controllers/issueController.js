@@ -202,6 +202,9 @@ exports.citizenUpvote = asyncHandler(async (req, res) => {
  * Body: { confirmed: Boolean, reason?: string }
  */
 exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
+
   const { confirmed, reason } = req.body;
   const issue = await Issue.findOne({
     _id: req.params.id,
@@ -314,6 +317,9 @@ exports.officerGetIssue = asyncHandler(async (req, res) => {
  * Maps: client-officer's updateIssueStatus(id, status) → PATCH /api/officer/issues/:id/status
  */
 exports.officerUpdateStatus = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
+
   const { status, note } = req.body;
   const VALID_STATUSES = ['reported','acknowledged','assigned','in_progress','resolved','rejected','reopened'];
   if (!VALID_STATUSES.includes(status))
@@ -355,6 +361,10 @@ exports.officerUpdateStatus = asyncHandler(async (req, res) => {
  */
 exports.officerAssignIssue = asyncHandler(async (req, res) => {
   const { officerId, department, note } = req.body;
+  if (!officerId && !department) {
+    return error(res, 'Must provide either officerId or department to assign', 400);
+  }
+
   const issue = await Issue.findById(req.params.id);
   if (!issue || issue.isDeleted) return error(res, 'Issue not found', 404);
 
@@ -411,6 +421,9 @@ exports.officerAssignIssue = asyncHandler(async (req, res) => {
  * Body: { text }
  */
 exports.officerAddNote = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
+
   const { text } = req.body;
   if (!text?.trim()) return error(res, 'Note text is required', 400);
 
@@ -429,6 +442,9 @@ exports.officerAddNote = asyncHandler(async (req, res) => {
  * Supports: client-officer's overridePriority(id, priority)
  */
 exports.officerSetPriority = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
+
   const { priority } = req.body;
   const VALID = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
   if (!VALID.includes(priority)) return error(res, `Priority must be one of: ${VALID.join(', ')}`, 400);
