@@ -1,24 +1,27 @@
-import { createContext, useContext, useState } from 'react';
-
-/**
- * AuthContext — Simple mock user context (no JWT / no auth).
- */
-const MOCK_USER = {
-  id: 'CIT-001',
-  name: 'Aditya Kumar',
-  email: 'aditya.kumar@example.com',
-  avatar: null,
-  ward: 'Ward 42',
-  city: 'Ballari',
-};
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user] = useState(MOCK_USER);
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('citizen_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const login = (token, userData) => {
+    localStorage.setItem('citizen_token', token);
+    localStorage.setItem('citizen_user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
+  const logout = () => {
+    localStorage.removeItem('citizen_token');
+    localStorage.removeItem('citizen_user');
+    setUser(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loading: false }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, loading: false }}>
       {children}
     </AuthContext.Provider>
   );

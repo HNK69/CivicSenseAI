@@ -1,65 +1,25 @@
 import api from './api';
 
-let MOCK_CONTRACTORS = [
-  { _id: 'con-001', name: 'BuildRight Pvt Ltd',   category: 'Roads',       rating: 4.2, completedJobs: 34, complaints: 2, flagged: false, flagStatus: 'Active',      lastActive: '2025-07-28' },
-  { _id: 'con-002', name: 'CleanCity Services',   category: 'Sanitation',  rating: 3.8, completedJobs: 58, complaints: 7, flagged: false, flagStatus: 'Under Warning',lastActive: '2025-07-27' },
-  { _id: 'con-003', name: 'PowerLine Electric',   category: 'Electricity', rating: 4.7, completedJobs: 22, complaints: 0, flagged: false, flagStatus: 'Active',      lastActive: '2025-07-29' },
-  { _id: 'con-004', name: 'AquaFlow Pipes Ltd',   category: 'Water',       rating: 2.9, completedJobs: 15, complaints: 9, flagged: true,  flagStatus: 'Flagged',     lastActive: '2025-07-15' },
-  { _id: 'con-005', name: 'GreenThumb Parks Co',  category: 'Parks',       rating: 4.0, completedJobs: 11, complaints: 1, flagged: false, flagStatus: 'Active',      lastActive: '2025-07-26' },
-];
-
-/** GET all contractors (CRIT-4 fix: /officer/contractors) */
+/** GET all contractors */
 export async function getContractors() {
-  try {
-    const res = await api.get('/officer/contractors');
-    const contractors = res?.data?.contractors || res?.data?.docs || res?.data || res?.contractors || res;
-    if (Array.isArray(contractors) && contractors.length > 0) return contractors;
-    return MOCK_CONTRACTORS;
-  } catch (err) {
-    console.warn('[contractorService] Failed to fetch contractors, using fallback:', err.message);
-    return MOCK_CONTRACTORS;
-  }
+  const res = await api.get('/officer/contractors');
+  return res?.data?.contractors || res?.data?.docs || res?.data || res?.contractors || [];
 }
 
-/** POST flag a contractor (CRIT-4 fix: /officer/contractors/:id/flag) */
+/** POST flag a contractor */
 export async function flagContractor(id) {
-  try {
-    const res = await api.post(`/officer/contractors/${id}/flag`);
-    return res?.data || res;
-  } catch (err) {
-    console.warn('[contractorService] Failed to flag contractor:', err.message);
-    MOCK_CONTRACTORS = MOCK_CONTRACTORS.map(c =>
-      c._id === id ? { ...c, flagged: true, flagStatus: 'Flagged' } : c
-    );
-    return { success: true, id, flagged: true, flagStatus: 'Flagged' };
-  }
+  const res = await api.post(`/officer/contractors/${id}/flag`);
+  return res?.data || res;
 }
 
-/** DELETE unflag a contractor (CRIT-4 fix: /officer/contractors/:id/flag) */
+/** DELETE unflag a contractor */
 export async function unflagContractor(id) {
-  try {
-    const res = await api.delete(`/officer/contractors/${id}/flag`);
-    return res?.data || res;
-  } catch (err) {
-    console.warn('[contractorService] Failed to unflag contractor:', err.message);
-    MOCK_CONTRACTORS = MOCK_CONTRACTORS.map(c =>
-      c._id === id ? { ...c, flagged: false, flagStatus: 'Active' } : c
-    );
-    return { success: true, id, flagged: false, flagStatus: 'Active' };
-  }
+  const res = await api.delete(`/officer/contractors/${id}/flag`);
+  return res?.data || res;
 }
 
-/** PUT update flag status of a contractor (CRIT-4 fix: /officer/contractors/:id/flag-status) */
+/** PUT update flag status of a contractor */
 export async function updateFlagStatus(id, flagStatus) {
-  try {
-    const res = await api.put(`/officer/contractors/${id}/flag-status`, { flagStatus });
-    return res?.data || res;
-  } catch (err) {
-    console.warn('[contractorService] Failed to update flag status:', err.message);
-    const isFlagged = flagStatus === 'Flagged' || flagStatus === 'Blacklisted';
-    MOCK_CONTRACTORS = MOCK_CONTRACTORS.map(c =>
-      c._id === id ? { ...c, flagged: isFlagged, flagStatus } : c
-    );
-    return { success: true, id, flagStatus, flagged: isFlagged };
-  }
+  const res = await api.put(`/officer/contractors/${id}/flag-status`, { flagStatus });
+  return res?.data || res;
 }
