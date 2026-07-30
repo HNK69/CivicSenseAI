@@ -26,8 +26,8 @@ const start = async () => {
 ║  HTTP   : http://localhost:${PORT}                   ║
 ║  Socket : ws://localhost:${PORT}                     ║
 ║                                                  ║
-║  Citizen  → http://localhost:${process.env.CLIENT_USER_URL    || 3000}   ║
-║  Officer  → http://localhost:${process.env.CLIENT_OFFICER_URL || 5173}   ║
+║  Citizen  → ${process.env.CLIENT_USER_URL    || 'http://localhost:3000'}   ║
+║  Officer  → ${process.env.CLIENT_OFFICER_URL || 'http://localhost:5173'}   ║
 ╚══════════════════════════════════════════════════╝
     `);
   });
