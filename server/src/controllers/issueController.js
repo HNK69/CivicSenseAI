@@ -243,14 +243,17 @@ exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/issues/transcribe
- * Audio voice transcription endpoint (stub).
+ * Audio voice transcription via Groq Whisper.
  */
 exports.transcribeVoice = asyncHandler(async (req, res) => {
   const { transcribeAudio } = require('../services/aiService');
   const audioFile = req.file;
-  const result = await transcribeAudio(audioFile ? (audioFile.buffer || audioFile.path) : null);
-  return success(res, { text: result.text || 'Pothole on main road causing heavy traffic and safety hazard near the market junction.' }, 'Audio transcribed successfully');
+  if (!audioFile) return error(res, 'No audio file received', 400);
+
+  const result = await transcribeAudio(audioFile.buffer || audioFile.path);
+  return success(res, { text: result.text || '' }, 'Audio transcribed successfully');
 });
+
 
 /* ====================================================================
    OFFICER — Issue Controller Functions

@@ -39,12 +39,16 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
 
   const [transcribing, setTranscribing] = useState(false);
   const [audioError, setAudioError]     = useState(null);
+  const [voiceAdded, setVoiceAdded]     = useState(false);
   const mediaRecorderRef                 = useRef(null);
   const audioChunksRef                   = useRef([]);
+
 
   /* ---- Voice recording & API transcription ---- */
   const startRecording = async () => {
     setAudioError(null);
+    setVoiceAdded(false);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
@@ -59,6 +63,7 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         stream.getTracks().forEach(track => track.stop());
         setTranscribing(true);
+        setAudioError(null);
         try {
           const formData = new FormData();
           formData.append('audio', audioBlob, 'voice-recording.webm');
@@ -70,18 +75,28 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
             body: formData,
           });
           const data = await res.json();
-          if (data.success && data.data?.text) {
-            setDesc(prev => prev ? `${prev}\n${data.data.text}` : data.data.text);
+
+          // Backend wraps in { success, data: { text } }
+          const transcribedText = data?.data?.text || data?.text || '';
+
+          if (transcribedText.trim()) {
+            // Append to existing description with a space separator
+            setDesc(prev =>
+              prev.trim() ? `${prev.trim()} ${transcribedText.trim()}` : transcribedText.trim()
+            );
+            setVoiceAdded(true);
           } else {
-            setDesc(prev => prev ? `${prev}\n[Transcribed audio description placeholder]` : '[Transcribed audio description placeholder]');
+            setAudioError('Could not transcribe audio. Please speak clearly and try again.');
           }
         } catch (err) {
           console.warn('Transcription API error:', err);
-          setDesc(prev => prev ? `${prev}\n[Transcribed audio description placeholder]` : '[Transcribed audio description placeholder]');
+          setAudioError('Transcription failed. Please check your connection and try again.');
+          setVoiceAdded(false);
         } finally {
           setTranscribing(false);
         }
       };
+
 
       mediaRecorder.start();
       setRecording(true);
@@ -242,7 +257,7 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
               className={recording ? 'text-danger fw-semibold small' : 'text-success fw-semibold small'}
               id="rec-timer"
             >
-              {transcribing ? '⏳ Converting speech to text...' : recording ? `🔴 ${formatTime(recSecs)}` : `✓ Voice added to description`}
+              {transcribing ? '⏳ Converting speech to text...' : recording ? `🔴 ${formatTime(recSecs)}` : (voiceAdded && !audioError) ? `✓ Voice added to description` : ''}
             </span>
           )}
         </div>
