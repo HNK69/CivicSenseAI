@@ -143,6 +143,7 @@ async function copilotChat({
   officer_id,
   officer_name,
   officer_department,
+  conversation_id,
   complaint_context = {},
 }) {
   const formatComplaintSummary = (c) => {
@@ -189,14 +190,15 @@ async function copilotChat({
       _client.post('/api/v1/copilot', {
         officer_query: message,
         context: {
-          officer_name: officer_name || 'Officer',
-          officer_department: officer_department || 'General',
           recent_complaints,
           backlog: (complaint_context?.backlog || []).map(formatComplaintSummary).filter(Boolean),
           priority_queue: (complaint_context?.priority_queue || []).map(formatComplaintSummary).filter(Boolean),
           work_orders,
           contractors_summary,
+          officer_name: officer_name || 'Officer',
+          officer_department: officer_department || 'General',
         },
+        conversation_id: conversation_id || `conv_${Date.now()}`,
       }),
     'copilotChat'
   );

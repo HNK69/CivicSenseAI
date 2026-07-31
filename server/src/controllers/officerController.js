@@ -611,12 +611,14 @@ exports.sendCopilotMessage = asyncHandler(async (req, res) => {
   }
 
   let reply;
+  const conversation_id = req.body.conversation_id || `conv_${req.officer?._id || Date.now()}`;
   try {
     reply = await municipalCopilotQuery({
       message,
       officer_id:         req.officer?._id?.toString() || 'officer_guest',
       officer_name:       req.officer?.name || 'Officer',
       officer_department: req.officer?.department || 'General',
+      conversation_id,
       complaint_context,
       tools:              [],
     });
