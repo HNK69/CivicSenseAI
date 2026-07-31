@@ -1,9 +1,26 @@
 import api from '../utils/axiosInstance.js';
 
-/** Get completed issues awaiting citizen verification */
+/**
+ * Get issues belonging to the logged-in citizen that are completed/verified/resolved.
+ * axiosInstance interceptor already returns response.data, so `res` here is the server JSON body:
+ *   { success, data: [...docs], pagination }
+ */
 export const getPendingVerifications = async () => {
-  const res = await api.get('/issues/mine', { params: { status: 'completed' } });
-  return res?.data?.issues || res?.data?.docs || res?.issues || res?.docs || res || [];
+  try {
+    const res = await api.get('/issues/mine', {
+      params: { status: 'completed' },
+    });
+    // Server paginated() returns: { success, data: [...], pagination }
+    // axiosInstance interceptor returns response.data, so res = { success, data, pagination }
+    return Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res)
+      ? res
+      : [];
+  } catch (err) {
+    console.warn('[verifyService] getPendingVerifications failed:', err?.response?.status, err?.message);
+    return [];
+  }
 };
 
 /** Citizen confirms repair is fixed */

@@ -202,14 +202,41 @@ const VerifyRepair = () => {
 };
 
 const VerifyCard = ({ item, onConfirm, onDispute, confirmLoading, disputeLoading }) => {
-  const id = item._id || item.id;
-  const beforeImg = item.images?.[0] || item.media?.[0]?.url || item.beforeImage || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=500&auto=format&fit=crop';
-  const afterImg = item.afterMedia?.[0]?.url || item.afterImage || item.repair_verification?.afterImage || item.images?.[0] || 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=500&auto=format&fit=crop';
-  
-  const aiConfidence = item.repair_verification?.confidence != null
-    ? (item.repair_verification.confidence * 100).toFixed(0)
-    : '92';
-  const aiExplanation = item.repair_verification?.explanation || 'AI evidence scan matched structural alignment between Before and After repair photos.';
+  const id = item?._id || item?.id;
+
+  // Safely extract image URL whether it's a string or an object {url: '...'}
+  const extractUrl = (val) => {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'object' && val.url) return val.url;
+    return null;
+  };
+
+  const beforeImg =
+    extractUrl(item?.images?.[0]) ||
+    extractUrl(item?.media?.[0]) ||
+    extractUrl(item?.beforeImage) ||
+    'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=500&auto=format&fit=crop';
+
+  const afterImg =
+    extractUrl(item?.afterMedia?.[0]) ||
+    extractUrl(item?.afterImage) ||
+    extractUrl(item?.repair_verification?.afterImage) ||
+    extractUrl(item?.workOrder?.afterImage) ||
+    'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=500&auto=format&fit=crop';
+
+  const ai = item?.repair_verification || item?.ai_repair_verification || {};
+  const aiConfidence = ai?.confidence != null
+    ? (ai.confidence * 100).toFixed(0)
+    : null;
+  const aiExplanation = ai?.explanation || 'Pending AI analysis — officer has approved this repair.';
+
+  const locationText =
+    item?.address ||
+    (typeof item?.location === 'string' ? item.location : item?.location?.address) ||
+    'Location not specified';
+
+
 
   return (
     <Card className="feature-card verify-card h-100 shadow-sm border">
@@ -218,7 +245,7 @@ const VerifyCard = ({ item, onConfirm, onDispute, confirmLoading, disputeLoading
           <div>
             <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>{item.title || 'Civic Infrastructure Repair'}</div>
             <div style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginTop: 3 }}>
-              <i className="bi bi-geo-alt-fill me-1 text-danger" />{item.address || item.location || 'Ballari Ward'}
+              <i className="bi bi-geo-alt-fill me-1 text-danger" />{locationText}
             </div>
             <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>
               Completed on {formatDate(item.updatedAt || item.createdAt)}
@@ -256,7 +283,9 @@ const VerifyCard = ({ item, onConfirm, onDispute, confirmLoading, disputeLoading
         >
           <div className="d-flex align-items-center justify-content-between mb-1">
             <span className="fw-bold text-success"><i className="bi bi-robot me-1" />AI Verification Result</span>
-            <Badge bg="success" style={{ fontSize: '.7rem' }}>{aiConfidence}% Confidence</Badge>
+            {aiConfidence != null && (
+              <Badge bg="success" style={{ fontSize: '.7rem' }}>{aiConfidence}% Confidence</Badge>
+            )}
           </div>
           <p className="mb-0 text-muted" style={{ fontSize: '.78rem', lineHeight: 1.45 }}>{aiExplanation}</p>
         </div>

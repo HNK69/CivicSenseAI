@@ -12,32 +12,34 @@ import { DEFAULT_COORDS } from '../utils/constants.js';
  * @param {number} radiusKm
  */
 export const getNearbyIssues = async (lat = DEFAULT_COORDS[0], lng = DEFAULT_COORDS[1], radiusKm = 2) => {
-  const res = await api.get('/issues/nearby', {
-    params: { lat, lng, radius: radiusKm },
-  });
+  try {
+    const res = await api.get('/issues/nearby', {
+      params: { lat, lng, radius: radiusKm },
+    });
 
-  const issues = res?.data?.issues || res?.issues || [];
+    const rawList = res?.data?.issues || res?.data?.docs || res?.data || res?.issues || res || [];
+    const issues = Array.isArray(rawList) ? rawList : [];
 
-  if (!Array.isArray(issues)) {
+    return issues.map(item => {
+      const coords = item.location?.coordinates || [lng, lat];
+      const severity = (item.priority || item.aiMeta?.priority || 'medium').toLowerCase();
+
+      return {
+        id: item._id || item.id,
+        _id: item._id || item.id,
+        title: item.title || 'Civic Issue',
+        category: item.category || 'General',
+        status: item.status || 'reported',
+        severity: ['high', 'medium', 'low'].includes(severity) ? severity : 'medium',
+        lat: coords[1] !== undefined ? coords[1] : lat,
+        lng: coords[0] !== undefined ? coords[0] : lng,
+        address: item.address || 'Ballari, Karnataka',
+      };
+    });
+  } catch (err) {
+    console.warn('[mapService] getNearbyIssues failed:', err?.message);
     return [];
   }
-
-  return issues.map(item => {
-    const coords = item.location?.coordinates || [lng, lat];
-    const severity = (item.priority || item.aiMeta?.priority || 'medium').toLowerCase();
-
-    return {
-      id: item._id || item.id,
-      _id: item._id || item.id,
-      title: item.title,
-      category: item.category,
-      status: item.status,
-      severity: ['high', 'medium', 'low'].includes(severity) ? severity : 'medium',
-      lat: coords[1] !== undefined ? coords[1] : lat,
-      lng: coords[0] !== undefined ? coords[0] : lng,
-      address: item.address || 'Ballari, Karnataka',
-    };
-  });
 };
 
 /** Get map cluster data for a bounding box */

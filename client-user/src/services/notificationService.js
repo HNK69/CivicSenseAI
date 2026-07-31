@@ -1,9 +1,23 @@
 import api from '../utils/axiosInstance.js';
 
+/**
+ * notificationService.js — Citizen notification API calls.
+ * axiosInstance interceptor returns response.data,
+ * so `res` here is the server JSON body.
+ * paginated() → { success, data: [...notifications], pagination }
+ * success()   → { success, message, data: { ... } }
+ */
+
 /** Get all notifications for the logged-in citizen */
 export const getNotifications = async () => {
-  const res = await api.get('/notifications');
-  return res?.data?.notifications || res?.notifications || res?.data?.docs || res?.docs || res || [];
+  try {
+    const res = await api.get('/notifications');
+    // paginated response: res = { success, data: [...], pagination }
+    return Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+  } catch (err) {
+    console.warn('[notificationService] getNotifications failed:', err?.response?.status, err?.message);
+    return [];
+  }
 };
 
 /** Mark a single notification as read */
