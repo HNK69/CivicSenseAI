@@ -192,8 +192,16 @@ const { verifyRepairAI } = require('../services/aiClient');
  */
 exports.getMyWorkOrders = asyncHandler(async (req, res) => {
   const contractorId = req.contractor._id;
+  const contractorEmail = req.contractor.email;
+  const contractorName = req.contractor.name;
+
   const workOrders = await WorkOrder.find({
-    $or: [{ contractor: contractorId }, { contractor_id: contractorId }],
+    $or: [
+      { contractor: contractorId },
+      { contractor_id: contractorId },
+      ...(contractorEmail ? [{ contractor_email: contractorEmail }] : []),
+      ...(contractorName ? [{ contractor_name: contractorName }] : []),
+    ],
   })
     .populate('issue')
     .sort('-createdAt')
@@ -207,9 +215,17 @@ exports.getMyWorkOrders = asyncHandler(async (req, res) => {
  */
 exports.getMyWorkOrderDetails = asyncHandler(async (req, res) => {
   const contractorId = req.contractor._id;
+  const contractorEmail = req.contractor.email;
+  const contractorName = req.contractor.name;
+
   const workOrder = await WorkOrder.findOne({
     _id: req.params.id,
-    $or: [{ contractor: contractorId }, { contractor_id: contractorId }],
+    $or: [
+      { contractor: contractorId },
+      { contractor_id: contractorId },
+      ...(contractorEmail ? [{ contractor_email: contractorEmail }] : []),
+      ...(contractorName ? [{ contractor_name: contractorName }] : []),
+    ],
   })
     .populate('issue')
     .lean();
@@ -224,11 +240,18 @@ exports.getMyWorkOrderDetails = asyncHandler(async (req, res) => {
  */
 exports.submitWorkOrderCompletion = asyncHandler(async (req, res) => {
   const contractorId = req.contractor._id;
+  const contractorEmail = req.contractor.email;
+  const contractorName = req.contractor.name;
   const { afterImage, afterVideo, after_image_urls, notes } = req.body;
 
   const workOrder = await WorkOrder.findOne({
     _id: req.params.id,
-    $or: [{ contractor: contractorId }, { contractor_id: contractorId }],
+    $or: [
+      { contractor: contractorId },
+      { contractor_id: contractorId },
+      ...(contractorEmail ? [{ contractor_email: contractorEmail }] : []),
+      ...(contractorName ? [{ contractor_name: contractorName }] : []),
+    ],
   }).populate('issue');
   if (!workOrder) return error(res, 'Work order not found or not assigned to you', 404);
 

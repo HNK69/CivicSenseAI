@@ -167,9 +167,9 @@ export default function RepairVerification() {
                         </div>
                         <img
                           src={
-                            rep.beforeImage?.url ||
+                            (typeof rep.beforeImage === 'string' ? rep.beforeImage : rep.beforeImage?.url) ||
                             rep.before_image_urls?.[0] ||
-                            rep.beforeImage ||
+                            rep.issue?.images?.[0]?.url ||
                             'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop'
                           }
                           alt="Before Repair"
@@ -191,9 +191,10 @@ export default function RepairVerification() {
                         </div>
                         <img
                           src={
-                            rep.afterImage?.url ||
+                            (typeof rep.afterImage === 'string' ? rep.afterImage : rep.afterImage?.url) ||
                             rep.after_image_urls?.[0] ||
-                            rep.afterImage ||
+                            rep.issue?.afterMedia?.[0]?.url ||
+                            (typeof rep.issue?.afterMedia?.[0] === 'string' ? rep.issue.afterMedia[0] : null) ||
                             'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b7?w=800&auto=format&fit=crop'
                           }
                           alt="After Repair Evidence"

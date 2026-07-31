@@ -311,27 +311,48 @@ exports.getRepairs = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 20 } = req.query;
   const filter = {};
   if (status) filter.verificationVerdict = status;
-  else        filter.status = { $in: ['completed', 'in_progress', 'PENDING_VERIFICATION'] };
+  else filter.status = { $in: ['completed', 'in_progress', 'PENDING_VERIFICATION', 'awaiting_verification', 'assigned'] };
 
   const { docs, total } = await paginate(WorkOrder, filter, {
     page, limit,
+    sort: { updatedAt: -1 },
     populate: [
-      { path: 'issue',      select: 'title category' },
-      { path: 'contractor', select: 'name company' },
+      { path: 'issue' },
+      { path: 'contractor', select: 'name company category rating email' },
     ],
   });
 
   // Map to repairService response shape
-  const repairs = docs.map(wo => ({
-    _id:          wo._id,
-    issueId:      wo.issue?._id,
-    title:        wo.issueTitle || wo.issue?.title,
-    status:       wo.verificationVerdict ? wo.verificationVerdict.toUpperCase() : 'PENDING_VERIFICATION',
-    beforeImage:  wo.beforeImage?.url  || null,
-    afterImage:   wo.afterImage?.url   || null,
-    contractor:   wo.contractor?.name  || null,
-    completedAt:  wo.completedAt       || wo.updatedAt,
-  }));
+  const repairs = docs.map(wo => {
+    const afterImgUrl =
+      wo.afterImage?.url ||
+      (typeof wo.afterImage === 'string' ? wo.afterImage : null) ||
+      (Array.isArray(wo.after_image_urls) ? wo.after_image_urls[0] : null) ||
+      wo.issue?.afterMedia?.[0]?.url ||
+      null;
+
+    const beforeImgUrl =
+      wo.beforeImage?.url ||
+      (typeof wo.beforeImage === 'string' ? wo.beforeImage : null) ||
+      (Array.isArray(wo.before_image_urls) ? wo.before_image_urls[0] : null) ||
+      wo.issue?.images?.[0]?.url ||
+      null;
+
+    return {
+      _id:          wo._id,
+      issueId:      wo.issue?._id,
+      title:        wo.issueTitle || wo.issue?.title || 'Civic Issue Repair',
+      status:       wo.verificationVerdict ? wo.verificationVerdict.toUpperCase() : (wo.status ? wo.status.toUpperCase() : 'PENDING_VERIFICATION'),
+      beforeImage:  beforeImgUrl,
+      afterImage:   afterImgUrl,
+      contractor:   wo.contractor?.name || wo.contractor_name || 'Assigned Contractor',
+      completedAt:  wo.completedAt || wo.updatedAt,
+      ai_repair_verification: wo.ai_repair_verification,
+      issue:        wo.issue,
+      department:   wo.department,
+      notes:        wo.notes,
+    };
+  });
 
   return paginated(res, repairs, total, page, limit);
 });
