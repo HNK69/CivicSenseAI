@@ -6,21 +6,20 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api
 export default function ContractorDashboard() {
   const [contractor, setContractor] = useState(null);
   const [workOrders, setWorkOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState('');
   const [selectedWO, setSelectedWO] = useState(null);
 
   // Evidence Form State
-  const [afterImage, setAfterImage] = useState('');
-  const [afterVideo, setAfterVideo] = useState('');
-  const [notes, setNotes] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [afterImage, setAfterImage]               = useState('');
+  const [afterVideo, setAfterVideo]               = useState('');
+  const [notes, setNotes]                         = useState('');
+  const [submitting, setSubmitting]               = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState('');
 
   useEffect(() => {
-    // Load contractor user from localStorage
     const savedUser = localStorage.getItem('contractor_user');
-    const token = localStorage.getItem('contractor_token');
+    const token     = localStorage.getItem('contractor_token');
 
     if (savedUser) {
       try {
@@ -46,7 +45,6 @@ export default function ContractorDashboard() {
       if (list.length > 0) setSelectedWO(list[0]);
     } catch (err) {
       console.warn('Failed to load contractor work orders from backend, using active session mock', err);
-      // Fallback demo work order if backend database has no assigned work order yet
       const fallbackList = [
         {
           _id: 'wo-demo-001',
@@ -54,6 +52,7 @@ export default function ContractorDashboard() {
           department: 'Roads & Public Works',
           status: 'in_progress',
           createdAt: new Date().toISOString(),
+          notes: 'Please prioritize safety barriers during execution.',
           issue: {
             _id: 'issue-demo-001',
             title: 'Deep Pothole Repairs — Outer Ring Road',
@@ -61,6 +60,7 @@ export default function ContractorDashboard() {
             priority: 'HIGH',
             ward: 'Ward 12 - Central',
             address: 'Outer Ring Road near Junction 4',
+            location: { coordinates: [76.9214, 15.1394] },
             description: 'Severe road deterioration creating traffic delays and hazard for commuters.',
             images: [{ url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop' }],
           },
@@ -78,7 +78,7 @@ export default function ContractorDashboard() {
     localStorage.removeItem('contractor_token');
     localStorage.removeItem('contractor_user');
     localStorage.removeItem('contractor_refresh');
-    window.location.href = 'http://localhost:3000/login';
+    window.location.href = '/login';
   };
 
   const handleFileUpload = (e, setUrl) => {
@@ -123,14 +123,12 @@ export default function ContractorDashboard() {
       };
 
       setSubmissionSuccess('Repair completion submitted! Status updated to: Awaiting AI Verification');
-      // Update local state
       setWorkOrders((prev) =>
         prev.map((item) => (item._id === selectedWO._id ? { ...item, ...updated, status: 'completed' } : item))
       );
       setSelectedWO({ ...selectedWO, ...updated, status: 'completed' });
     } catch (err) {
       console.warn('Backend completion endpoint error fallback', err);
-      // Clean state fallback
       const updated = {
         ...selectedWO,
         status: 'completed',
@@ -157,6 +155,14 @@ export default function ContractorDashboard() {
       default:
         return 'bg-secondary text-white';
     }
+  };
+
+  const getCoordinates = (wo) => {
+    const coords = wo?.issue?.location?.coordinates || wo?.location?.coordinates;
+    if (Array.isArray(coords) && coords.length === 2) {
+      return `${coords[1].toFixed(4)}° N, ${coords[0].toFixed(4)}° E`;
+    }
+    return null;
   };
 
   return (
@@ -202,10 +208,10 @@ export default function ContractorDashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>
-              {contractor?.name || 'Apex Roadworks Contractor'}
+              {contractor?.name || 'Apex Infrastructure Contractor'}
             </div>
             <div style={{ fontSize: '0.75rem', color: '#F59E0B', fontWeight: 500 }}>
-              {contractor?.company || 'Authorized Vendor'}
+              {contractor?.company || 'Authorized Municipal Vendor'}
             </div>
           </div>
 
@@ -318,7 +324,7 @@ export default function ContractorDashboard() {
             </div>
           </div>
 
-          {/* Work Order Execution & Evidence Panel */}
+          {/* Work Order Details & Evidence Upload Panel */}
           <div className="col-lg-8">
             {!selectedWO ? (
               <div
@@ -341,11 +347,12 @@ export default function ContractorDashboard() {
                   padding: '1.75rem',
                 }}
               >
-                {/* Header */}
+                {/* Header Metadata */}
                 <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <span className="badge bg-primary">{selectedWO.issue?.category || 'General Repair'}</span>
-                    <span className="badge bg-secondary">{selectedWO.issue?.ward || 'Municipal District'}</span>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                    <span className="badge bg-primary">{selectedWO.issue?.category || selectedWO.department || 'General Repair'}</span>
+                    <span className="badge bg-danger">Priority: {selectedWO.issue?.priority || 'HIGH'}</span>
+                    <span className="badge bg-secondary">{selectedWO.issue?.ward || 'Municipal Ward'}</span>
                     <span className={`badge ${getStatusBadgeClass(selectedWO.status)}`}>
                       {selectedWO.status === 'completed' ? 'Awaiting AI Verification' : selectedWO.status?.replace(/_/g, ' ')}
                     </span>
@@ -353,27 +360,41 @@ export default function ContractorDashboard() {
                   <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>
                     {selectedWO.issueTitle || selectedWO.issue?.title || 'Assigned Repair Task'}
                   </h2>
-                  {selectedWO.issue?.address && (
-                    <p style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '0.25rem' }}>
-                      <i className="bi bi-geo-alt me-1" /> {selectedWO.issue.address}
-                    </p>
-                  )}
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.4rem', fontSize: '0.85rem', color: '#94A3B8', flexWrap: 'wrap' }}>
+                    {selectedWO.issue?.address && (
+                      <span><i className="bi bi-geo-alt me-1 text-danger" />{selectedWO.issue.address}</span>
+                    )}
+                    {getCoordinates(selectedWO) && (
+                      <span><i className="bi bi-compass me-1 text-warning" />{getCoordinates(selectedWO)}</span>
+                    )}
+                    <span><i className="bi bi-calendar-event me-1 text-info" />Assigned: {new Date(selectedWO.createdAt).toLocaleDateString()}</span>
+                  </div>
                 </div>
 
                 {/* Complaint Details */}
-                <div style={{ marginBottom: '1.5rem', background: 'rgba(15, 23, 42, 0.5)', padding: '1rem', borderRadius: '12px' }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                    Complaint Details
+                <div style={{ marginBottom: '1.25rem', background: 'rgba(15, 23, 42, 0.5)', padding: '1rem', borderRadius: '12px' }}>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                    Complaint Description
                   </h4>
                   <p style={{ fontSize: '0.9rem', color: '#CBD5E1', margin: 0 }}>
-                    {selectedWO.issue?.description || 'Municipal complaint details registered for active resolution.'}
+                    {selectedWO.issue?.description || 'Municipal complaint description registered for repair.'}
                   </p>
                 </div>
 
-                {/* Before Media Section */}
+                {/* Officer Notes */}
+                <div style={{ marginBottom: '1.5rem', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1rem', borderRadius: '12px' }}>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 600, color: '#60A5FA', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                    <i className="bi bi-journal-text me-1" /> Officer Notes &amp; Special Instructions
+                  </h4>
+                  <p style={{ fontSize: '0.875rem', color: '#E2E8F0', margin: 0 }}>
+                    {selectedWO.notes || selectedWO.assignmentNotes || 'Perform repair as per municipal standards. Submit clear before and after photo evidence.'}
+                  </p>
+                </div>
+
+                {/* BEFORE Media Section */}
                 <div style={{ marginBottom: '1.75rem' }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-                    Before Repair Media (Issue Evidence)
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                    Before Repair Media (Original Citizen Evidence)
                   </h4>
                   <div className="row g-3">
                     <div className="col-md-6">
@@ -392,10 +413,24 @@ export default function ContractorDashboard() {
                         </div>
                       </div>
                     </div>
+                    {(selectedWO.beforeVideo?.url || selectedWO.issue?.videos?.[0]?.url) && (
+                      <div className="col-md-6">
+                        <div style={{ background: '#0F172A', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <video
+                            src={selectedWO.beforeVideo?.url || selectedWO.issue?.videos?.[0]?.url}
+                            controls
+                            style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+                          />
+                          <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', color: '#94A3B8', textAlign: 'center' }}>
+                            BEFORE VIDEO
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Submit Completion & Upload Repair Evidence Form */}
+                {/* Upload Repair Evidence Form */}
                 <div style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '1.5rem', borderRadius: '14px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#38BDF8', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <i className="bi bi-cloud-arrow-up" /> Upload Repair Evidence &amp; Submit Completion
@@ -413,7 +448,7 @@ export default function ContractorDashboard() {
                         ⏳ Status: Awaiting AI Verification
                       </h5>
                       <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>
-                        Evidence submitted. The repair is undergoing automated AI side-by-side comparison and awaiting municipal officer sign-off.
+                        Repair evidence submitted. The system is executing automated AI side-by-side verification and awaiting officer approval.
                       </p>
                     </div>
                   ) : (

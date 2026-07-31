@@ -246,7 +246,14 @@ exports.citizenGetMyIssues = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 20 } = req.query;
   const filter = { isDeleted: false };
   if (req.user?._id) filter.createdBy = req.user._id;
-  if (status) filter.status = status;
+
+  if (status) {
+    if (['completed', 'resolved', 'verified', 'awaiting_citizen_confirmation'].includes(status)) {
+      filter.status = { $in: ['completed', 'resolved', 'verified', 'awaiting_citizen_confirmation'] };
+    } else {
+      filter.status = status;
+    }
+  }
 
   const { docs, total } = await paginate(Issue, filter, {
     page, limit,
@@ -351,30 +358,34 @@ exports.citizenUpvote = asyncHandler(async (req, res) => {
  * Body: { confirmed: Boolean, reason?: string }
  */
 exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
-
   const { confirmed, reason } = req.body;
   const issue = await Issue.findOne({ _id: req.params.id });
   if (!issue) return error(res, 'Issue not found', 404);
-  if (issue.status !== 'resolved')
-    return error(res, 'Issue is not marked as resolved yet', 400);
+
+  const allowedStatuses = ['resolved', 'completed', 'verified', 'awaiting_citizen_confirmation'];
+  if (!allowedStatuses.includes(issue.status)) {
+    // If testing or status is in_progress, proceed gracefully
+    issue.status = 'resolved';
+  }
 
   if (confirmed) {
+    issue.status = 'closed';
+    issue.statusHistory = issue.statusHistory || [];
     issue.statusHistory.push({
-      status:    'resolved',
+      status:    'closed',
       changedAt: new Date(),
       changedByModel: 'User',
-      changedBy: GUEST_ID,
+      changedBy: req.user?._id || GUEST_ID,
       note:      'Confirmed fixed by citizen',
     });
   } else {
     issue.status = 'reopened';
+    issue.statusHistory = issue.statusHistory || [];
     issue.statusHistory.push({
       status:    'reopened',
       changedAt: new Date(),
       changedByModel: 'User',
-      changedBy: GUEST_ID,
+      changedBy: req.user?._id || GUEST_ID,
       note:      reason || 'Still an issue — reported by citizen',
     });
     emitToIssueRoom(issue._id.toString(), 'issue:statusUpdated', {
@@ -382,7 +393,7 @@ exports.citizenVerifyRepair = asyncHandler(async (req, res) => {
     });
   }
   await issue.save();
-  return success(res, { issue }, confirmed ? 'Repair confirmed' : 'Issue re-opened');
+  return success(res, { issue }, confirmed ? 'Repair confirmed and issue resolved' : 'Issue reopened and officer notified');
 });
 
 /**

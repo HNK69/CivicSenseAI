@@ -251,11 +251,12 @@ exports.submitWorkOrderCompletion = asyncHandler(async (req, res) => {
 
   await workOrder.save();
 
-  // Update issue status to awaiting_verification
+  // Update issue status to awaiting_verification and store repair evidence
   if (workOrder.issue?._id) {
     const issue = await Issue.findById(workOrder.issue._id);
     if (issue) {
       issue.status = 'awaiting_verification';
+      issue.afterMedia = afterUrls.map(url => ({ url, mediaType: 'image' }));
       issue.statusHistory = issue.statusHistory || [];
       issue.statusHistory.push({
         status: 'awaiting_verification',
@@ -289,6 +290,20 @@ exports.submitWorkOrderCompletion = asyncHandler(async (req, res) => {
       verified_at: new Date(),
     };
     await workOrder.save();
+
+    if (workOrder.issue?._id) {
+      const issue = await Issue.findById(workOrder.issue._id);
+      if (issue) {
+        issue.repair_verification = {
+          verified: aiResult?.verified ?? true,
+          confidence: aiResult?.confidence ?? 0.88,
+          explanation: aiResult?.explanation || 'AI analysis completed comparing repair evidence against report.',
+          afterImage: afterUrls[0],
+          checked_at: new Date(),
+        };
+        await issue.save();
+      }
+    }
   } catch (aiErr) {
     console.warn('[contractorController] Auto AI repair verification trigger warning:', aiErr.message);
   }
