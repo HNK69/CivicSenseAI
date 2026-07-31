@@ -56,12 +56,18 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(async () => {
-    const refreshToken = localStorage.getItem('citizen_refresh');
-    await logoutCitizen(refreshToken);
-    localStorage.removeItem('citizen_token');
-    localStorage.removeItem('citizen_refresh');
-    localStorage.removeItem('citizen_user');
-    setUser(null);
+    try {
+      const refreshToken = localStorage.getItem('citizen_refresh');
+      await logoutCitizen(refreshToken);
+    } catch (e) {
+      console.warn('Logout API warning', e);
+    } finally {
+      localStorage.removeItem('citizen_token');
+      localStorage.removeItem('citizen_refresh');
+      localStorage.removeItem('citizen_user');
+      setUser(null);
+      window.location.href = '/login';
+    }
   }, []);
 
   return (

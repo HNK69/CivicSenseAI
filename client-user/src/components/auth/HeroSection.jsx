@@ -37,18 +37,18 @@ export function HeroSection() {
 
         <h1 style={{
           fontFamily: "'Space Grotesk', sans-serif",
-          fontSize: 'clamp(3rem, 8.5vw, 6rem)',
-          fontWeight: 700, lineHeight: 0.92, letterSpacing: '-0.045em',
+          fontSize: 'clamp(2.4rem, 5.5vw, 4.2rem)',
+          fontWeight: 700, lineHeight: 1.05, letterSpacing: '-0.035em',
           color: 'var(--text-primary)', margin: 0,
         }}>
-          <motion.span variants={stagger(0.09, 0.15)} style={{ display: 'flex', flexWrap: 'wrap' }}>
+          <motion.span variants={stagger(0.09, 0.15)} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
             {TITLE.map((word, i) => (
-              <span key={word} style={{ overflow: 'hidden', paddingBottom: '0.25rem', paddingRight: '0.35rem' }}>
+              <span key={word} style={{ paddingBottom: '0.25rem' }}>
                 <motion.span
                   variants={wordReveal}
                   style={{
                     display: 'inline-block',
-                    ...(i === 2 ? { fontStyle: 'italic', fontWeight: 400, color: 'var(--auth-accent)' } : {}),
+                    ...(i === 2 ? { fontStyle: 'italic', fontWeight: 500, color: 'var(--auth-accent)' } : {}),
                   }}
                 >
                   {word}

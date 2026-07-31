@@ -56,9 +56,16 @@ export function AuthPanel({ defaultRole = 'citizen' }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <motion.span
                 layout
-                style={{ fontSize: '0.68rem', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.22em', color: 'var(--text-secondary)' }}
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: 'var(--text-secondary)',
+                  whiteSpace: 'nowrap',
+                }}
               >
-                CivicSenseAI
+                CivicSense AI
               </motion.span>
               {role && (
                 <motion.button

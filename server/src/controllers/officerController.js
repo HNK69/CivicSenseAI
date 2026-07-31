@@ -166,15 +166,42 @@ exports.createWorkOrder = asyncHandler(async (req, res) => {
   const issue = await Issue.findById(issueId);
   if (!issue || issue.isDeleted) return error(res, 'Issue not found', 404);
 
+  // Fetch real contractor document from MongoDB
+  const Contractor = require('../models/Contractor');
+  let contractorObj = null;
+  if (contractorId) {
+    contractorObj = await Contractor.findById(contractorId);
+  }
+
+  const beforeImage = issue.images?.[0]?.url
+    ? { url: issue.images[0].url }
+    : { url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop' };
+
+  const before_image_urls = issue.images?.length
+    ? issue.images.map(i => i.url)
+    : [beforeImage.url];
+
   // Check if a work order already exists for this issue
   let wo = await WorkOrder.findOne({ issue: issueId });
   if (wo) {
     if (department)   wo.department = department;
-    if (contractorId) wo.contractor = contractorId;
-    if (assignedTo)   wo.assignedOfficer = assignedTo;
+    if (contractorId) {
+      wo.contractor      = contractorId;
+      wo.contractor_id   = contractorId;
+      wo.contractor_name = contractorObj?.name || 'Assigned Contractor';
+      wo.contractor_email= contractorObj?.email || null;
+    }
+    if (assignedTo || req.officer?._id) {
+      wo.assignedOfficer = assignedTo || req.officer?._id;
+      wo.officer_id       = req.officer?._id || assignedTo;
+    }
     if (notes)        wo.notes = notes;
     if (dueDate)      wo.dueDate = dueDate;
-    wo.status = 'in_progress';
+    wo.complaint_id     = issue._id;
+    wo.assignment_date  = new Date();
+    wo.beforeImage      = beforeImage;
+    wo.before_image_urls= before_image_urls;
+    wo.status           = 'in_progress';
     wo.history.push({
       action:    'assigned to contractor',
       note:      notes || null,
@@ -184,14 +211,22 @@ exports.createWorkOrder = asyncHandler(async (req, res) => {
     await wo.save();
   } else {
     wo = await WorkOrder.create({
-      issue:           issueId,
-      issueTitle:      issue.title,
-      department:      department || DEPT_MAP[issue.category] || 'General',
-      assignedOfficer: assignedTo   || null,
-      contractor:      contractorId || null,
-      dueDate:         dueDate      || null,
-      notes:           notes        || null,
-      status:          'pending',
+      issue:            issueId,
+      issueTitle:       issue.title,
+      department:       department || DEPT_MAP[issue.category] || 'General',
+      assignedOfficer:  assignedTo   || req.officer?._id || null,
+      officer_id:       req.officer?._id || assignedTo || null,
+      contractor:       contractorId || null,
+      contractor_id:    contractorId || null,
+      contractor_name:  contractorObj?.name || null,
+      contractor_email: contractorObj?.email || null,
+      complaint_id:     issue._id,
+      assignment_date:  new Date(),
+      beforeImage,
+      before_image_urls,
+      dueDate:          dueDate      || null,
+      notes:            notes        || null,
+      status:           'assigned',
       history: [{
         action:    'created and assigned',
         changedBy: req.officer?._id || null,
@@ -206,8 +241,7 @@ exports.createWorkOrder = asyncHandler(async (req, res) => {
   if (department) issue.assignedDepartment = department;
   await issue.save({ validateBeforeSave: false });
 
-  // Populate contractor details for real-time socket events & response
-  await wo.populate('contractor', 'name company category rating');
+  await wo.populate('contractor', 'name company category rating email');
 
   return created(res, { workOrder: wo }, 'Work order assigned successfully');
 });
@@ -610,57 +644,94 @@ exports.sendCopilotMessage = asyncHandler(async (req, res) => {
     console.warn('[officerController] Failed to fetch context for Copilot:', ctxErr.message);
   }
 
+  /* ── Smart rule-based copilot (always-available) ───────────────────── */
+  const buildRuleBasedReply = (msg, ctx) => {
+    const q          = msg.toLowerCase();
+    const complaints = ctx.recent_complaints || [];
+    const workOrders = ctx.work_orders       || [];
+    const contractors= ctx.contractors_summary || [];
+
+    const total      = complaints.length;
+    const open       = complaints.filter(c => ['reported','acknowledged'].includes(c.status)).length;
+    const inProgress = complaints.filter(c => c.status === 'in_progress').length;
+    const resolved   = complaints.filter(c => c.status === 'resolved').length;
+    const critical   = complaints.filter(c => c.priority === 'CRITICAL' || c.severity === 'CRITICAL').length;
+
+    if (q.includes('top') || q.includes('unresolv') || q.includes('urgent') || q.includes('this week')) {
+      const top5 = complaints.filter(c => ['reported','acknowledged','in_progress'].includes(c.status)).slice(0, 5);
+      if (top5.length === 0) return 'No unresolved issues at the moment. All complaints appear to be resolved or in progress.';
+      const list = top5.map((c, i) => `${i+1}. "${c.title || c.text?.slice(0,40)}" — ${c.category} [${c.status}] (${c.priority || 'MEDIUM'})`).join('\n');
+      return `Top ${top5.length} unresolved civic issue${top5.length>1?'s':''} this week:\n\n${list}\n\nTotal tracked: ${total} issues (${open} open, ${inProgress} in-progress).`;
+    }
+
+    if (q.includes('contractor') && (q.includes('complaint') || q.includes('most'))) {
+      if (contractors.length === 0) return 'No contractors are currently registered in the system.';
+      const sorted = [...contractors].sort((a, b) => b.assigned_count - a.assigned_count);
+      const top = sorted[0];
+      const list = sorted.slice(0,3).map(c => `• ${c.name} (${c.category}) — ${c.assigned_count} work orders, rated ${c.rating}/5`).join('\n');
+      return `Contractor with the highest workload:\n\n${list}\n\nTotal registered contractors: ${contractors.length}.`;
+    }
+
+    if (q.includes('zone') || q.includes('ward')) {
+      const byCategory = complaints.reduce((acc, c) => { acc[c.category] = (acc[c.category]||0)+1; return acc; }, {});
+      const catList = Object.entries(byCategory).map(([k,v]) => `${k}: ${v}`).join(', ');
+      return `There are ${total} total complaints across all wards.\n\nBreakdown by category: ${catList || 'No data available'}.\n\nCurrently ${open} open and ${inProgress} in-progress.`;
+    }
+
+    if (q.includes('work order') || q.includes('summarize') || q.includes('today')) {
+      if (workOrders.length === 0) return 'No work orders have been assigned yet today.';
+      const recent = workOrders.slice(0,3);
+      const list = recent.map(w => `• "${w.issue_title}" → ${w.contractor_name} (${w.department}, ${w.status})`).join('\n');
+      return `Work order summary — ${workOrders.length} total:\n\n${list}\n\nContractors active: ${contractors.length}.`;
+    }
+
+    if (q.includes('critical') || q.includes('priority')) {
+      if (critical === 0) return `No CRITICAL issues at the moment. You have ${total} total complaints tracked, with ${open} open.`;
+      const critList = complaints.filter(c => c.priority==='CRITICAL'||c.severity==='CRITICAL').slice(0,5)
+        .map(c => `• "${c.title||c.text?.slice(0,40)}" — ${c.category} [${c.status}]`).join('\n');
+      return `⚠ ${critical} CRITICAL issue${critical>1?'s':''} require immediate attention:\n\n${critList}`;
+    }
+
+    if (q.includes('how many') || q.includes('count') || q.includes('stat')) {
+      return `Municipal dashboard snapshot:\n\n• Total complaints: ${total}\n• Open: ${open}\n• In Progress: ${inProgress}\n• Resolved: ${resolved}\n• Critical: ${critical}\n• Work orders: ${workOrders.length}\n• Contractors: ${contractors.length}`;
+    }
+
+    // Default — general overview
+    if (total > 0) {
+      const topIssue = complaints[0];
+      return `Currently managing ${total} civic complaints across all departments.\n\n📊 Status: ${open} open, ${inProgress} in-progress, ${resolved} resolved.\n⚠ Critical: ${critical}\n\nMost recent complaint: "${topIssue.title || topIssue.text?.slice(0,50)}" (${topIssue.category}, ${topIssue.status}).`;
+    }
+    return `The CivicSense AI Copilot is ready. No active complaints are currently in the system. Try reporting a new complaint from the Citizen Portal to populate the dashboard.`;
+  };
+
   let reply;
   const conversation_id = req.body.conversation_id || `conv_${req.officer?._id || Date.now()}`;
-  try {
-    reply = await municipalCopilotQuery({
-      message,
-      officer_id:         req.officer?._id?.toString() || 'officer_guest',
-      officer_name:       req.officer?.name || 'Officer',
-      officer_department: req.officer?.department || 'General',
-      conversation_id,
-      complaint_context,
-      tools:              [],
-    });
-  } catch (aiErr) {
-    console.warn('[officerController] Copilot AI microservice fallback triggered:', aiErr.message);
-    const lowerQuery  = message.toLowerCase();
-    const complaints  = complaint_context.recent_complaints || [];
-    const workOrders  = complaint_context.work_orders || [];
-    const contractors = complaint_context.contractors_summary || [];
 
-    if (lowerQuery.includes('contractor')) {
-      if (contractors.length > 0) {
-        const sorted = [...contractors].sort((a, b) => b.assigned_count - a.assigned_count);
-        const top = sorted[0];
-        reply = `Contractor "${top.name}" (${top.category}) currently has the highest workload with ${top.assigned_count} active assigned work orders. Total registered contractors: ${contractors.length}.`;
-      } else {
-        reply = `Currently tracking 5 active municipal contractors including Apex Roadworks and CleanCity Sanitation.`;
-      }
-    } else if (lowerQuery.includes('work order') || lowerQuery.includes('summarize today')) {
-      if (workOrders.length > 0) {
-        reply = `Summary of work orders: ${workOrders.length} active orders tracked. Recent assignment: "${workOrders[0].issue_title}" assigned to ${workOrders[0].contractor_name} (${workOrders[0].department} department, status: ${workOrders[0].status}).`;
-      } else {
-        reply = `There are currently no active work orders pending execution today.`;
-      }
-    } else if (lowerQuery.includes('zone') || lowerQuery.includes('ward')) {
-      const zoneACount = complaints.filter(c => (c.zone || c.address || '').toLowerCase().includes('zone-a') || true).length;
-      reply = `There are ${complaints.length > 0 ? complaints.length : 0} complaints logged in Zone-A and surrounding municipal wards.`;
-    } else if (lowerQuery.includes('priority') || lowerQuery.includes('ticket') || lowerQuery.includes('top')) {
-      if (complaints.length > 0) {
-        const topTicket = complaints[0];
-        reply = `The top priority ticket currently reported is "${topTicket.title}" (${topTicket.category} department, severity: ${topTicket.severity}). Status: ${topTicket.status}. Total active tickets: ${complaints.length}.`;
-      } else {
-        reply = `All priority queues are clear. No critical civic issues require immediate intervention.`;
-      }
-    } else {
-      reply = `Currently tracking ${complaints.length} active civic issues and ${workOrders.length} work orders. Top priority item: "${complaints[0]?.title || 'Pothole Maintenance'}" (${complaints[0]?.category || 'Roads'}).`;
-    }
+  try {
+    // Race the AI service call against an 8-second timeout
+    const aiTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI service timeout after 8s')), 8000)
+    );
+    reply = await Promise.race([
+      municipalCopilotQuery({
+        message,
+        officer_id:         req.officer?._id?.toString() || 'officer_guest',
+        officer_name:       req.officer?.name || 'Officer',
+        officer_department: req.officer?.department || 'General',
+        conversation_id,
+        complaint_context,
+        tools:              [],
+      }),
+      aiTimeout,
+    ]);
+  } catch (aiErr) {
+    console.warn('[officerController] Copilot AI service unavailable, using smart fallback:', aiErr.message);
+    reply = buildRuleBasedReply(message, complaint_context);
   }
 
   const answerText = typeof reply === 'string'
     ? reply
-    : (reply?.answer || reply?.response || reply?.reply || JSON.stringify(reply));
+    : (reply?.answer || reply?.response || reply?.reply || buildRuleBasedReply(message, complaint_context));
 
   return success(res, { reply: answerText, answer: answerText, complaint_context });
 });

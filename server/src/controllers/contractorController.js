@@ -192,7 +192,9 @@ const { verifyRepairAI } = require('../services/aiClient');
  */
 exports.getMyWorkOrders = asyncHandler(async (req, res) => {
   const contractorId = req.contractor._id;
-  const workOrders = await WorkOrder.find({ contractor: contractorId })
+  const workOrders = await WorkOrder.find({
+    $or: [{ contractor: contractorId }, { contractor_id: contractorId }],
+  })
     .populate('issue')
     .sort('-createdAt')
     .lean();
@@ -205,7 +207,10 @@ exports.getMyWorkOrders = asyncHandler(async (req, res) => {
  */
 exports.getMyWorkOrderDetails = asyncHandler(async (req, res) => {
   const contractorId = req.contractor._id;
-  const workOrder = await WorkOrder.findOne({ _id: req.params.id, contractor: contractorId })
+  const workOrder = await WorkOrder.findOne({
+    _id: req.params.id,
+    $or: [{ contractor: contractorId }, { contractor_id: contractorId }],
+  })
     .populate('issue')
     .lean();
 
@@ -221,7 +226,10 @@ exports.submitWorkOrderCompletion = asyncHandler(async (req, res) => {
   const contractorId = req.contractor._id;
   const { afterImage, afterVideo, after_image_urls, notes } = req.body;
 
-  const workOrder = await WorkOrder.findOne({ _id: req.params.id, contractor: contractorId }).populate('issue');
+  const workOrder = await WorkOrder.findOne({
+    _id: req.params.id,
+    $or: [{ contractor: contractorId }, { contractor_id: contractorId }],
+  }).populate('issue');
   if (!workOrder) return error(res, 'Work order not found or not assigned to you', 404);
 
   let afterUrls = after_image_urls || [];

@@ -10,17 +10,34 @@ export async function getChatHistory() {
 
 /** POST send a message to the AI copilot */
 export async function sendMessage(message, issueId) {
-  const res = await api.post('/officer/copilot/chat', {
-    message,
-    issueId,
-    conversation_id: currentConversationId,
-  });
+  let res;
+  try {
+    res = await api.post('/officer/copilot/chat', {
+      message,
+      issueId,
+      conversation_id: currentConversationId,
+    });
+  } catch (err) {
+    console.error('[copilotService] API error:', err?.message || err);
+    throw err;
+  }
 
   if (res?.data?.conversation_id) {
     currentConversationId = res.data.conversation_id;
+  } else if (res?.conversation_id) {
+    currentConversationId = res.conversation_id;
   }
 
-  const replyText = res?.data?.reply || res?.data?.message || res?.data?.answer || res?.reply || res?.answer || res;
+  // Backend shape: { success, data: { reply, answer, complaint_context } }
+  const replyText =
+    res?.data?.reply   ||
+    res?.data?.answer  ||
+    res?.reply         ||
+    res?.answer        ||
+    res?.data?.message ||
+    (typeof res === 'string' ? res : null) ||
+    'No response from copilot.';
+
   return {
     _id: `msg-${Date.now()}`,
     role: 'ai',

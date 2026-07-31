@@ -59,9 +59,10 @@ body {
   background-attachment: fixed;
   color: var(--text-primary);
   min-height: 100vh;
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 /* ── Typography ───────────────────────────────────────────────────── */

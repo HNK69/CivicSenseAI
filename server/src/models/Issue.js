@@ -96,6 +96,8 @@ const repairVerificationSchema = new mongoose.Schema(
     explanation:      { type: String, default: null },
     remaining_issues: [{ type: String }],
     diff_summary:     { type: diffSummarySchema, default: null },
+    afterImage:       { type: String, default: null },
+    verdict:          { type: String, default: null },
     verified_at:      { type: Date, default: null },
   },
   { _id: false }
@@ -116,6 +118,8 @@ const issueSchema = new mongoose.Schema(
     // Media (Cloudinary URLs — always long-lived/public)
     images: [{ url: String, publicId: String }],
     videos: [{ url: String, publicId: String }],
+    // Contractor after-repair media
+    afterMedia: [{ url: String, mediaType: { type: String, default: 'image' } }],
 
     // Location — GeoJSON Point for $near queries
     location: {
@@ -127,7 +131,12 @@ const issueSchema = new mongoose.Schema(
     // Status (citizen-facing + officer-facing combined)
     status: {
       type: String,
-      enum: ['reported', 'acknowledged', 'assigned', 'in_progress', 'resolved', 'rejected', 'reopened'],
+      enum: [
+        'reported', 'acknowledged', 'assigned', 'in_progress',
+        'awaiting_verification', 'verified', 'completed',
+        'awaiting_citizen_confirmation', 'resolved', 'closed',
+        'rejected', 'reopened',
+      ],
       default: 'reported',
     },
 

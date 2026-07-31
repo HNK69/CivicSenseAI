@@ -58,8 +58,9 @@ body {
   background: linear-gradient(145deg, #FAF8F4 0%, #F5F1EB 35%, #EEE9DF 70%, #F7F3EE 100%);
   background-attachment: fixed;
   color: var(--o-text);
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Space Grotesk', 'Inter', sans-serif;

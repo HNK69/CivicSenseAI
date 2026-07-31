@@ -21,12 +21,18 @@ const workOrderSchema = new mongoose.Schema(
     issueTitle:      { type: String, default: null },                    // denormalized for quick listing
     assignedOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'Officer', default: null },
     department:      { type: String, required: true },                   // e.g. "PWD"
-    contractor:      { type: mongoose.Schema.Types.ObjectId, ref: 'Contractor', default: null },
+    // Explicit requirement fields
+    contractor_id:    { type: mongoose.Schema.Types.ObjectId, ref: 'Contractor', default: null },
+    contractor_name:  { type: String, default: null },
+    contractor_email: { type: String, default: null },
+    complaint_id:     { type: mongoose.Schema.Types.ObjectId, ref: 'Issue', default: null },
+    officer_id:       { type: mongoose.Schema.Types.ObjectId, ref: 'Officer', default: null },
+    assignment_date:  { type: Date, default: Date.now },
 
     status: {
       type: String,
-      enum: ['pending', 'scheduled', 'in_progress', 'completed', 'verified', 'cancelled',
-             // client-officer mock values (normalised):
+      enum: ['pending', 'assigned', 'scheduled', 'in_progress', 'completed', 'verified', 'cancelled',
+             'Repair Uploaded', 'Awaiting AI Verification', 'awaiting_verification',
              'PENDING', 'IN_PROGRESS', 'RESOLVED', 'PENDING_VERIFICATION'],
       default: 'pending',
     },
@@ -38,9 +44,10 @@ const workOrderSchema = new mongoose.Schema(
     cost:  { type: Number, default: null },
     notes: { type: String, default: null },
 
-    // Repair verification media (single legacy fields kept for backward compat)
-    beforeImage: { url: String, publicId: String },
-    afterImage:  { url: String, publicId: String },
+    // Repair verification media
+    beforeImage:     { url: String, publicId: String },
+    afterImage:      { url: String, publicId: String },
+    after_video_url: { type: String, default: null },
 
     // Multi-image arrays for AI verify-repair endpoint
     before_image_urls: [{ type: String }],
@@ -49,7 +56,7 @@ const workOrderSchema = new mongoose.Schema(
     // Verdict from officer (or AI) verification
     verificationVerdict: {
       type: String,
-      enum: ['approved', 'rejected', 'pending', 'VERIFIED', 'PENDING_VERIFICATION', null],
+      enum: ['approved', 'rejected', 'rework_requested', 'rework', 'pending', 'VERIFIED', 'PENDING_VERIFICATION', null],
       default: null,
     },
     verificationNote: { type: String, default: null },
