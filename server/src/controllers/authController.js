@@ -331,22 +331,16 @@ exports.contractorLogin = asyncHandler(async (req, res) => {
   if (!email || !password) return error(res, 'Email and password are required', 400);
 
   const Contractor = require('../models/Contractor');
+  const { DEFAULT_CONTRACTORS } = require('../services/seedService');
 
-  // Auto-seed default contractor if none exists
-  const defaultEmail = 'contractor@apex.gov.in';
   let contractor = await Contractor.findOne({ email: email.toLowerCase() }).select('+passwordHash');
 
-  if (!contractor && email.toLowerCase() === defaultEmail) {
-    contractor = await Contractor.create({
-      name: 'Apex Roadworks (Demo Contractor)',
-      company: 'Apex Infrastructure Ltd',
-      email: defaultEmail,
-      passwordHash: 'contractor123',
-      category: 'Roads & Infra',
-      rating: 4.8,
-    });
-    // Re-fetch with passwordHash selected
-    contractor = await Contractor.findOne({ email: defaultEmail }).select('+passwordHash');
+  if (!contractor) {
+    const matchDemo = DEFAULT_CONTRACTORS.find(c => c.email.toLowerCase() === email.toLowerCase());
+    if (matchDemo) {
+      await Contractor.create(matchDemo);
+      contractor = await Contractor.findOne({ email: email.toLowerCase() }).select('+passwordHash');
+    }
   }
 
   if (!contractor) {

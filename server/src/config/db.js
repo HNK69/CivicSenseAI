@@ -18,6 +18,8 @@ const connectDB = async () => {
         socketTimeoutMS: 45000,
       });
       console.log(`[db] MongoDB connected — ${mongoose.connection.host}`);
+      const { seedContractors } = require('../services/seedService');
+      await seedContractors();
       return;
     } catch (err) {
       attempt++;
