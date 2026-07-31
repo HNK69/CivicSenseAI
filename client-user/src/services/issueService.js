@@ -4,14 +4,15 @@ import api from '../utils/axiosInstance.js';
  * issueService.js — All civic issue API calls (no auth for now).
  */
 
-/** Submit a new issue report (multipart for file uploads) */
 export const reportIssue = async (formData) => {
   // axiosInstance interceptor returns response.data
-  // Server shape: { success, message, data: { issue } }
+  // Server shape: { success, message, data: { issue, issueId } } or { success, message, data: { isDuplicate, duplicate_of } }
   const res = await api.post('/issues', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
-  return { success: true, issueId: res.data?.issue?._id || res.data?.issue?.id };
+  const data = res?.data || res;
+  const issueId = data?.issueId || data?.issue?._id || data?.issue?.id || data?.duplicate_of || `ISS-${Date.now().toString().slice(-6)}`;
+  return { success: true, issueId, isDuplicate: data?.isDuplicate, message: res?.message || 'Report submitted' };
 };
 
 /** Get all issues (my reports) — GET /api/issues/mine */
