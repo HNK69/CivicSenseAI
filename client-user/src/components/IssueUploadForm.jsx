@@ -18,7 +18,7 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
   const [recording, setRecording] = useState(false);
   const [recSecs, setRecSecs]     = useState(0);
   const [description, setDesc]    = useState('');
-  const [category, setCategory]   = useState('');
+  const category = 'Other'; // AI service classifies automatically — no manual selection needed
   const [errors, setErrors]       = useState({});
   const fileInputRef              = useRef(null);
   const recIntervalRef            = useRef(null);
@@ -137,8 +137,6 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
     const errs = {};
     if (!description.trim() || description.trim().length < 20)
       errs.description = 'Description must be at least 20 characters.';
-    if (!category)
-      errs.category = 'Please select a category.';
     if (!coords && !gpsError)
       errs.location = 'Waiting for GPS…';
 
@@ -146,8 +144,8 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
     if (Object.keys(errs).length > 0) return;
 
     const formData = new FormData();
-    // Auto-generate a title from category + first line of description
-    const autoTitle = `${category} Issue: ${description.trim().slice(0, 60)}${description.trim().length > 60 ? '…' : ''}`;
+    // Auto-generate a title from the first line of description
+    const autoTitle = `Civic Issue: ${description.trim().slice(0, 60)}${description.trim().length > 60 ? '…' : ''}`;
     formData.append('title',       autoTitle);
     formData.append('description', description);
     formData.append('category',    category);
@@ -168,28 +166,7 @@ const IssueUploadForm = ({ onSubmit, loading = false }) => {
   return (
     <Form noValidate onSubmit={handleSubmit} id="issue-report-form">
 
-      {/* ---- Category ---- */}
-      <Form.Group className="mb-3" controlId="issueCategory">
-        <Form.Label className="fw-semibold" style={{ fontSize: '.875rem' }}>
-          Issue Category
-        </Form.Label>
-        <Form.Select
-          value={category}
-          onChange={e => setCategory(e.target.value)}
-          isInvalid={!!errors.category}
-          style={{ borderRadius: 8, fontSize: '.875rem' }}
-          id="issue-category-select"
-        >
-          <option value="">Select a category…</option>
-          <option value="Roads">🚧 Roads & Potholes</option>
-          <option value="Water">💧 Water Supply</option>
-          <option value="Electricity">⚡ Street Lights / Electricity</option>
-          <option value="Sanitation">🗑️ Garbage & Sanitation</option>
-          <option value="Parks">🌳 Parks & Public Spaces</option>
-          <option value="Other">📋 Other</option>
-        </Form.Select>
-        <Form.Control.Feedback type="invalid">{errors.category}</Form.Control.Feedback>
-      </Form.Group>
+      {/* Category is auto-classified by the AI service — no dropdown needed */}
 
       {/* ---- Upload Zone ---- */}
       <Form.Group className="mb-3">

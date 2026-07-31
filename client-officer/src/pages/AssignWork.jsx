@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { getWorkOrders, assignWorkOrder } from '../services/assignService';
+import { getIssues } from '../services/issueService';
 import { useFetch } from '../hooks/useFetch';
 import { DEPARTMENTS } from '../utils/constants';
 import { formatDate } from '../utils/helpers';
 import BackButton from '../components/BackButton';
 
 function AssignWork() {
-  const { data: orders, loading, refetch } = useFetch(getWorkOrders, []);
+  const { data: orders, loading: ordersLoading, refetch } = useFetch(getWorkOrders, []);
+  const { data: issues, loading: issuesLoading } = useFetch(getIssues, []);
   const [form, setForm] = useState({ issueId: '', dept: '', assignedTo: '' });
   const [msg, setMsg] = useState('');
 
@@ -38,9 +40,21 @@ function AssignWork() {
         <form onSubmit={handleAssign}>
           <div className="row g-3">
             <div className="col-md-4">
-              <label className="form-label fw-600" style={{ fontSize: '0.8rem' }}>Issue ID</label>
-              <input className="form-control form-control-sm" placeholder="e.g. iss-001"
-                value={form.issueId} onChange={e => setForm(p => ({ ...p, issueId: e.target.value }))} required />
+              <label className="form-label fw-600" style={{ fontSize: '0.8rem' }}>Select Issue / Complaint</label>
+              <select
+                className="form-select form-select-sm"
+                value={form.issueId}
+                onChange={e => setForm(p => ({ ...p, issueId: e.target.value }))}
+                required
+                disabled={issuesLoading}
+              >
+                <option value="">{issuesLoading ? 'Loading issues…' : 'Select Issue…'}</option>
+                {(issues || []).map(i => (
+                  <option key={i._id} value={i._id}>
+                    {i.title || i.description?.slice(0, 40) || 'Untitled Issue'} ({i.category || 'General'})
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="col-md-4">
               <label className="form-label fw-600" style={{ fontSize: '0.8rem' }}>Department</label>
@@ -67,7 +81,7 @@ function AssignWork() {
         <div className="px-4 py-3 border-bottom fw-600" style={{ color: 'var(--scr-navy)' }}>
           <i className="bi bi-clipboard-check me-2"></i>Pending Work Orders
         </div>
-        {loading && <div className="text-center py-4"><div className="spinner-border text-primary spinner-border-sm"></div></div>}
+        {ordersLoading && <div className="text-center py-4"><div className="spinner-border text-primary spinner-border-sm"></div></div>}
         <div className="table-responsive">
           <table className="table table-hover mb-0">
             <thead className="table-light">
