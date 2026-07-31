@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getIssues } from '../services/issueService';
+import { getIssues, updateIssueStatus, deleteIssue } from '../services/issueService';
 import { useFetch } from '../hooks/useFetch';
 import { getStatusBadgeColor, formatDate } from '../utils/helpers';
 import BackButton from '../components/BackButton';
@@ -9,11 +9,43 @@ import MapView from '../components/MapView';
 const STATUS_FILTERS = ['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED'];
 
 function IssueDashboard() {
-  const { data: issues, loading } = useFetch(getIssues, []);
+  const { data: fetchedIssues, loading } = useFetch(getIssues, []);
+  const [issuesList, setIssuesList] = useState([]);
   const [view,   setView]   = useState('list');
   const [filter, setFilter] = useState('ALL');
 
-  const filtered = (issues || []).filter(i => filter === 'ALL' || i.status === filter);
+  useEffect(() => {
+    if (fetchedIssues) {
+      setIssuesList(fetchedIssues);
+    }
+  }, [fetchedIssues]);
+
+  const handleResolve = async (id) => {
+    try {
+      await updateIssueStatus(id, 'resolved', 'Manually marked resolved by officer.');
+      setIssuesList(prev => prev.map(item => item._id === id ? { ...item, status: 'resolved' } : item));
+    } catch (err) {
+      console.error('Failed to resolve issue:', err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this issue?')) return;
+    try {
+      await deleteIssue(id);
+      setIssuesList(prev => prev.filter(item => item._id !== id));
+    } catch (err) {
+      console.error('Failed to delete issue:', err);
+    }
+  };
+
+  const filtered = issuesList.filter(i => {
+    if (filter === 'ALL') return true;
+    if (filter === 'OPEN') return i.status === 'reported' || i.status === 'acknowledged' || i.status === 'assigned';
+    if (filter === 'IN_PROGRESS') return i.status === 'in_progress';
+    if (filter === 'RESOLVED') return i.status === 'resolved';
+    return i.status === filter;
+  });
 
   const priorityStyle = (p) => {
     if (p === 'CRITICAL') return { background: 'var(--o-red-bg)',    color: 'var(--o-red)',    border: '1px solid #fecaca' };
@@ -136,6 +168,7 @@ function IssueDashboard() {
                       <th>Upvotes</th>
                       <th>Reported</th>
                       <th>Location</th>
+                      <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -193,11 +226,37 @@ function IssueDashboard() {
                             {issue.location?.address}
                           </span>
                         </td>
+                        <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
+                          <div className="d-inline-flex gap-1">
+                            {issue.status !== 'resolved' ? (
+                              <button
+                                className="btn btn-sm btn-success d-inline-flex align-items-center gap-1"
+                                style={{ borderRadius: 6, padding: '3px 8px', fontSize: '.75rem', fontWeight: 600 }}
+                                onClick={() => handleResolve(issue._id)}
+                                title="Mark Issue Resolved"
+                              >
+                                <i className="bi bi-check-circle-fill" /> Done
+                              </button>
+                            ) : (
+                              <span className="badge bg-success me-1" style={{ fontSize: '.7rem', padding: '5px 8px' }}>
+                                <i className="bi bi-check2-all me-1" />Done
+                              </span>
+                            )}
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              style={{ borderRadius: 6, padding: '3px 7px', fontSize: '.75rem' }}
+                              onClick={() => handleDelete(issue._id)}
+                              title="Delete Issue"
+                            >
+                              <i className="bi bi-trash-fill" />
+                            </button>
+                          </div>
+                        </td>
                       </motion.tr>
                     ))}
                     {filtered.length === 0 && !loading && (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', color: 'var(--o-text-3)', padding: '2.5rem', fontSize: '.875rem' }}>
+                        <td colSpan={8} style={{ textAlign: 'center', color: 'var(--o-text-3)', padding: '2.5rem', fontSize: '.875rem' }}>
                           <i className="bi bi-inbox d-block mb-2" style={{ fontSize: '1.8rem' }} />
                           No issues match this filter.
                         </td>

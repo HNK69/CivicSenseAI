@@ -49,7 +49,8 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('officer_token');
     localStorage.removeItem('officer_refresh');
     localStorage.removeItem('officer_user');
-    window.location.href = '/login';
+    const mainLoginUrl = import.meta.env.VITE_MAIN_LOGIN_URL || (window.location.hostname === 'localhost' ? 'http://localhost:3000/login' : '/login');
+    window.location.href = mainLoginUrl;
   };
 
   return (

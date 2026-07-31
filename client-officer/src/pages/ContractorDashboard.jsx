@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -16,6 +16,52 @@ export default function ContractorDashboard() {
   const [notes, setNotes]                         = useState('');
   const [submitting, setSubmitting]               = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState('');
+
+  // Live Camera State
+  const [isCameraActive, setIsCameraActive]       = useState(false);
+  const [cameraError, setCameraError]             = useState('');
+  const videoRef  = useRef(null);
+  const streamRef = useRef(null);
+
+  const startCamera = async () => {
+    setCameraError('');
+    setIsCameraActive(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error('Camera access error:', err);
+      setCameraError('Unable to access device camera. Please grant camera permissions or select a photo file.');
+      setIsCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    setAfterImage(dataUrl);
+    stopCamera();
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('contractor_user');
@@ -78,7 +124,8 @@ export default function ContractorDashboard() {
     localStorage.removeItem('contractor_token');
     localStorage.removeItem('contractor_user');
     localStorage.removeItem('contractor_refresh');
-    window.location.href = '/login';
+    const mainLoginUrl = import.meta.env.VITE_MAIN_LOGIN_URL || (window.location.hostname === 'localhost' ? 'http://localhost:3000/login' : '/login');
+    window.location.href = mainLoginUrl;
   };
 
   const handleFileUpload = (e, setUrl) => {
@@ -453,28 +500,132 @@ export default function ContractorDashboard() {
                     </div>
                   ) : (
                     <form onSubmit={handleSubmitCompletion}>
-                      {/* Image Upload */}
+                      {/* Image Capture / Upload */}
                       <div style={{ marginBottom: '1.25rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#CBD5E1', marginBottom: '0.4rem' }}>
-                          Upload Repair Image Evidence <span style={{ color: '#EF4444' }}>*</span>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#CBD5E1', marginBottom: '0.5rem' }}>
+                          Capture / Upload Repair Image Evidence <span style={{ color: '#EF4444' }}>*</span>
                         </label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleFileUpload(e, setAfterImage)}
-                          style={{
-                            width: '100%',
-                            padding: '0.6rem 0.8rem',
-                            borderRadius: '8px',
-                            background: '#0F172A',
-                            border: '1px solid #334155',
-                            color: '#CBD5E1',
-                            fontSize: '0.85rem',
-                          }}
-                        />
+
+                        {/* Action Buttons: Camera vs File */}
+                        <div className="d-flex gap-2 mb-3">
+                          <button
+                            type="button"
+                            onClick={isCameraActive ? stopCamera : startCamera}
+                            style={{
+                              background: isCameraActive ? '#DC2626' : 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
+                              border: 'none',
+                              color: '#FFF',
+                              padding: '0.55rem 1rem',
+                              borderRadius: '8px',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                            }}
+                          >
+                            <i className={`bi ${isCameraActive ? 'bi-x-circle-fill' : 'bi-camera-fill'}`} />
+                            {isCameraActive ? 'Close Camera' : '📷 Take Live Photo with Camera'}
+                          </button>
+
+                          <label
+                            style={{
+                              background: '#1E293B',
+                              border: '1px solid #334155',
+                              color: '#CBD5E1',
+                              padding: '0.55rem 1rem',
+                              borderRadius: '8px',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              margin: 0,
+                            }}
+                          >
+                            <i className="bi bi-folder-symlink-fill" /> Select File from Device
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={(e) => handleFileUpload(e, setAfterImage)}
+                              style={{ display: 'none' }}
+                            />
+                          </label>
+                        </div>
+
+                        {cameraError && (
+                          <div style={{ color: '#FCA5A5', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+                            <i className="bi bi-exclamation-triangle-fill me-1" /> {cameraError}
+                          </div>
+                        )}
+
+                        {/* Live Camera View Finder */}
+                        {isCameraActive && (
+                          <div style={{ position: 'relative', background: '#000', borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem', border: '2px solid #0EA5E9' }}>
+                            <video
+                              ref={videoRef}
+                              autoPlay
+                              playsInline
+                              style={{ width: '100%', height: '280px', objectFit: 'cover', display: 'block' }}
+                            />
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: '12px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                display: 'flex',
+                                gap: '12px',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={capturePhoto}
+                                style={{
+                                  background: '#10B981',
+                                  border: 'none',
+                                  color: '#FFF',
+                                  padding: '0.6rem 1.4rem',
+                                  borderRadius: '25px',
+                                  fontWeight: 700,
+                                  fontSize: '0.9rem',
+                                  boxShadow: '0 4px 12px rgba(16,185,129,0.4)',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.5rem',
+                                }}
+                              >
+                                <i className="bi bi-disc-fill" style={{ fontSize: '1.1rem' }} /> Snap Photo
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Captured / Selected Image Preview */}
                         {afterImage && (
-                          <div style={{ marginTop: '0.5rem' }}>
-                            <img src={afterImage} alt="Repair Preview" style={{ height: '100px', borderRadius: '8px', objectFit: 'cover' }} />
+                          <div style={{ background: '#0F172A', border: '1px solid #10B981', borderRadius: '10px', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                            <div className="d-flex align-items-center gap-3">
+                              <img src={afterImage} alt="Repair Preview" style={{ height: '70px', width: '90px', borderRadius: '8px', objectFit: 'cover' }} />
+                              <div>
+                                <span className="badge bg-success" style={{ fontSize: '0.75rem' }}>
+                                  <i className="bi bi-check-circle-fill me-1" /> Photo Ready for AI Verification
+                                </span>
+                                <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '4px' }}>
+                                  Captured repair evidence image attached
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setAfterImage('')}
+                              style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid #EF4444', color: '#FCA5A5', padding: '0.35rem 0.65rem', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer' }}
+                            >
+                              Retake / Clear
+                            </button>
                           </div>
                         )}
                       </div>

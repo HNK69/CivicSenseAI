@@ -75,6 +75,7 @@ officerIssueRouter.patch('/:id/status',     verifyToken, requireOfficer, [body('
 officerIssueRouter.patch('/:id/assign',     verifyToken, requireOfficer, ic.officerAssignIssue);
 officerIssueRouter.post('/:id/notes',       verifyToken, requireOfficer, [body('text').trim().notEmpty()], ic.officerAddNote);
 officerIssueRouter.patch('/:id/priority',   verifyToken, requireOfficer, [body('priority').isIn(['CRITICAL','HIGH','MEDIUM','LOW'])], ic.officerSetPriority);
+officerIssueRouter.delete('/:id',           verifyToken, requireOfficer, ic.officerDeleteIssue);
 officerIssueRouter.post('/:id/investigate', verifyToken, requireOfficer, ic.officerInvestigate);
 
 module.exports = { citizenIssueRouter, officerIssueRouter };
