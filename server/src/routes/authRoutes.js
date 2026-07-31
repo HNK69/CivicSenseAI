@@ -56,6 +56,12 @@ officerAuthRouter.post('/login', [
   body('password').notEmpty(),
 ], auth.officerLogin);
 
+// POST /api/officer/auth/register
+officerAuthRouter.post('/register', [
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 6 }),
+], auth.officerRegister);
+
 // POST /api/officer/auth/refresh
 officerAuthRouter.post('/refresh', auth.officerRefresh);
 

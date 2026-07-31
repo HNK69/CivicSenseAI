@@ -2,6 +2,8 @@ import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import Layout                from './components/Layout.jsx';
+import ProtectedRoute        from './components/ProtectedRoute.jsx';
+import LoginPage             from './pages/LoginPage.jsx';
 import Dashboard             from './pages/Dashboard.jsx';
 import AIInvestigation       from './pages/AIInvestigation.jsx';
 import IssueDashboard        from './pages/IssueDashboard.jsx';
@@ -12,18 +14,18 @@ import RepairVerification    from './pages/RepairVerification.jsx';
 import ContractorPerformance from './pages/ContractorPerformance.jsx';
 import MunicipalCopilot      from './pages/MunicipalCopilot.jsx';
 
-/**
- * Centralized React Router v6 route config.
- * All pages are children of Layout (which renders Navbar + Sidebar + <Outlet />).
- *
- * Add a new page:
- *  1. Create src/pages/YourPage.jsx
- *  2. Import above and add { path: 'your-path', element: <YourPage /> } to children
- */
 const router = createBrowserRouter([
   {
-    path:     '/',
-    element:  <Layout />,
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
+    path: '/',
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true,                    element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard',              element: <Dashboard /> },
@@ -36,6 +38,10 @@ const router = createBrowserRouter([
       { path: 'contractor-performance', element: <ContractorPerformance /> },
       { path: 'copilot',                element: <MunicipalCopilot /> },
     ],
+  },
+  {
+    path: '*',
+    element: <Navigate to="/login" replace />,
   },
 ]);
 

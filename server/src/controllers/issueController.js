@@ -149,7 +149,7 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
     location,
     address:      address || null,
     assignedDepartment,
-    createdBy:    GUEST_ID,
+    createdBy:    req.user?._id || GUEST_ID,
     images,
     videos,
     priority:     resolvedPriority,
@@ -158,7 +158,7 @@ exports.citizenCreateIssue = asyncHandler(async (req, res) => {
       status:    'reported',
       changedAt: new Date(),
       changedByModel: 'User',
-      changedBy: GUEST_ID,
+      changedBy: req.user?._id || GUEST_ID,
     }],
 
     // Persist full AI analysis result
@@ -244,7 +244,8 @@ exports.citizenGetMyIssues = asyncHandler(async (req, res) => {
     return error(res, 'Database unavailable — please try again shortly', 503);
   }
   const { status, page = 1, limit = 20 } = req.query;
-  const filter = { isDeleted: false }; // TODO: filter by req.user._id after auth is added
+  const filter = { isDeleted: false };
+  if (req.user?._id) filter.createdBy = req.user._id;
   if (status) filter.status = status;
 
   const { docs, total } = await paginate(Issue, filter, {

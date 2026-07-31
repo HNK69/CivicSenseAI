@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
+import { loginCitizen, registerCitizen, logoutCitizen } from '../services/authService.js';
 
 const AuthContext = createContext(null);
 
@@ -8,20 +9,63 @@ export const AuthProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const login = (token, userData) => {
-    localStorage.setItem('citizen_token', token);
-    localStorage.setItem('citizen_user', JSON.stringify(userData));
-    setUser(userData);
-  };
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const logout = () => {
+  /** Login with real backend — returns { success, user } */
+  const login = useCallback(async (email, password) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await loginCitizen({ email, password });
+      // Backend shape: { success, data: { user, accessToken, refreshToken } }
+      const { user: userData, accessToken, refreshToken } = res.data;
+      localStorage.setItem('citizen_token', accessToken);
+      localStorage.setItem('citizen_refresh', refreshToken);
+      localStorage.setItem('citizen_user', JSON.stringify(userData));
+      setUser(userData);
+      return { success: true, user: userData };
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Login failed. Please try again.';
+      setError(msg);
+      return { success: false, message: msg };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /** Register a new citizen account */
+  const register = useCallback(async ({ name, email, phone, password }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await registerCitizen({ name, email, phone, password });
+      const { user: userData, accessToken, refreshToken } = res.data;
+      localStorage.setItem('citizen_token', accessToken);
+      localStorage.setItem('citizen_refresh', refreshToken);
+      localStorage.setItem('citizen_user', JSON.stringify(userData));
+      setUser(userData);
+      return { success: true, user: userData };
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Registration failed. Please try again.';
+      setError(msg);
+      return { success: false, message: msg };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    const refreshToken = localStorage.getItem('citizen_refresh');
+    await logoutCitizen(refreshToken);
     localStorage.removeItem('citizen_token');
+    localStorage.removeItem('citizen_refresh');
     localStorage.removeItem('citizen_user');
     setUser(null);
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, loading: false }}>
+    <AuthContext.Provider value={{ user, setUser, login, register, logout, loading, error, setError, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

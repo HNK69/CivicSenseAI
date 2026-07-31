@@ -16,7 +16,7 @@ const axiosInstance = axios.create({
 
 /* ---- Request interceptor: attach JWT if present ---- */
 axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('civicsense_token');
+  const token = localStorage.getItem('citizen_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -27,8 +27,13 @@ axiosInstance.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     if (status === 401) {
-      // TODO: redirect to login page
-      console.warn('Unauthorized — redirect to login');
+      // Clear stale auth
+      localStorage.removeItem('citizen_token');
+      localStorage.removeItem('citizen_refresh');
+      localStorage.removeItem('citizen_user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

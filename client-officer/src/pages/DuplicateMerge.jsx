@@ -56,6 +56,11 @@ function DuplicateMerge() {
                 <i className="bi bi-files text-muted me-2"></i>
                 <strong>{d.title}</strong>
                 <span className="text-muted ms-2">— {formatDate(d.createdAt)} · {d.upvotes} upvotes</span>
+                {d.similarity != null && (
+                  <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '.7rem' }}>
+                    {(d.similarity * 100).toFixed(0)}% Match
+                  </span>
+                )}
               </li>
             ))}
           </ul>

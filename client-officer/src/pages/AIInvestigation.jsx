@@ -87,7 +87,7 @@ function AIInvestigation() {
                   }}
                 >
                   <i className="bi bi-lightbulb-fill flex-shrink-0 mt-1" />
-                  {f.suggestedAction}
+                  {f.reasoning || f.suggestedAction || 'AI analysis complete.'}
                 </div>
               </div>
               <div style={{ padding: '10px 20px 16px', borderTop: '1px solid var(--o-border)' }}>

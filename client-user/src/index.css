@@ -554,3 +554,109 @@ h1, h2, h3, h4, h5, h6 {
   .before-after-grid { grid-template-columns: 1fr; }
   .status-table thead th, .status-table tbody td { padding: .7rem .75rem; }
 }
+
+/* ── Login UI Design System Tokens & Animations ────────────────────── */
+:root {
+  --auth-bg: #F5F1EB;
+  --auth-accent: #243B53;
+  --auth-grid-line: rgba(36, 59, 83, 0.05);
+  --auth-grid-line-strong: rgba(36, 59, 83, 0.08);
+  --auth-line-faint: rgba(36, 59, 83, 0.28);
+  --auth-ring-faint: rgba(36, 59, 83, 0.10);
+  --auth-beam: rgba(36, 59, 83, 0.07);
+  --auth-mesh-blue: radial-gradient(circle, rgba(36, 59, 83, 0.18), transparent 66%);
+  --auth-mesh-emerald: radial-gradient(circle, rgba(79, 138, 91, 0.15), transparent 66%);
+  --auth-mesh-warm: radial-gradient(circle, rgba(196, 139, 45, 0.16), transparent 66%);
+}
+
+[data-accent="officer"] {
+  --auth-accent: #3A7D7B;
+}
+
+.auth-panel {
+  border-radius: 28px !important;
+  border: 1px solid rgba(36, 59, 83, 0.10) !important;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92), rgba(247, 245, 242, 0.82)) !important;
+  backdrop-filter: blur(18px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+  box-shadow: 0 1px 1px rgba(36, 59, 83, 0.04), 0 8px 20px -12px rgba(36, 59, 83, 0.14), 0 40px 70px -40px rgba(36, 59, 83, 0.24) !important;
+}
+
+.auth-field-shell:focus-within {
+  border-color: var(--auth-accent) !important;
+  box-shadow: 0 0 0 4px rgba(36, 59, 83, 0.10) !important;
+}
+
+.auth-field-shell[data-invalid="true"] {
+  border-color: #B94A48 !important;
+}
+
+.auth-role-card:hover {
+  border-color: var(--auth-accent) !important;
+  box-shadow: 0 12px 28px -20px rgba(36, 59, 83, 0.45) !important;
+}
+
+.auth-stat-line {
+  transition: transform 0.5s ease !important;
+}
+.group:hover .auth-stat-line {
+  transform: scaleX(1) !important;
+}
+
+.auth-link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 100%;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.auth-link-underline:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.auth-noise-overlay {
+  opacity: 0.25;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+@media (min-width: 1024px) {
+  .auth-layout-grid {
+    grid-template-columns: 60fr 40fr !important;
+  }
+  .auth-panel-side {
+    border-left: 1px solid rgba(36, 59, 83, 0.10) !important;
+    border-top: none !important;
+  }
+}
+
+/* ── Positioning & Layout Utility Helpers ────────────────────────── */
+.absolute { position: absolute !important; }
+.relative { position: relative !important; }
+.inset-0 { top: 0 !important; right: 0 !important; bottom: 0 !important; left: 0 !important; }
+.pointer-events-none { pointer-events: none !important; }
+.overflow-hidden { overflow: hidden !important; }
+.rounded-full { border-radius: 9999px !important; }
+.h-full { height: 100% !important; }
+.w-full { width: 100% !important; }
+.border { border: 1px solid var(--border-base) !important; }
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+

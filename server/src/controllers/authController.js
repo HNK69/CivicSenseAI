@@ -179,12 +179,26 @@ exports.officerLogin = asyncHandler(async (req, res) => {
   if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
 
   const { email, password } = req.body;
-  const officer = await Officer.findOne({ email }).select('+passwordHash');
-  if (!officer) return error(res, 'Invalid credentials', 401);
-  if (!officer.isActive) return error(res, 'Account deactivated', 403);
+  let officer = await Officer.findOne({ email }).select('+passwordHash');
 
-  const valid = await officer.comparePassword(password);
-  if (!valid) return error(res, 'Invalid credentials', 401);
+  // Auto-register officer if account does not exist yet
+  if (!officer) {
+    console.log(`[authController] Creating new officer account for ${email}`);
+    officer = await Officer.create({
+      name: email.split('@')[0].replace('.', ' '),
+      email,
+      passwordHash: password,
+      role: 'officer',
+      department: 'PWD',
+      designation: 'Municipal Officer',
+    });
+    officer = await Officer.findById(officer._id).select('+passwordHash');
+  } else {
+    const valid = await officer.comparePassword(password);
+    if (!valid) return error(res, 'Invalid credentials', 401);
+  }
+
+  if (!officer.isActive) return error(res, 'Account deactivated', 403);
 
   const tokenPayload = { id: officer._id, role: officer.role, email: officer.email };
   const accessToken  = generateAccessToken(tokenPayload);
@@ -198,6 +212,39 @@ exports.officerLogin = asyncHandler(async (req, res) => {
     accessToken,
     refreshToken,
   }, 'Officer login successful');
+});
+
+/**
+ * POST /api/officer/auth/register
+ */
+exports.officerRegister = asyncHandler(async (req, res) => {
+  const { name, email, password, phone, department, designation } = req.body;
+
+  let officer = await Officer.findOne({ email });
+  if (officer) return error(res, 'Officer email already registered', 409);
+
+  officer = await Officer.create({
+    name: name || email.split('@')[0],
+    email,
+    passwordHash: password,
+    role: 'officer',
+    department: department || 'PWD',
+    designation: designation || 'Municipal Officer',
+    phone: phone || null,
+  });
+
+  const tokenPayload = { id: officer._id, role: officer.role, email: officer.email };
+  const accessToken  = generateAccessToken(tokenPayload);
+  const refreshToken = generateRefreshToken(tokenPayload);
+
+  officer.refreshTokens.push(refreshToken);
+  await officer.save({ validateBeforeSave: false });
+
+  return created(res, {
+    officer: officer.toJSON(),
+    accessToken,
+    refreshToken,
+  }, 'Officer account created');
 });
 
 /**
