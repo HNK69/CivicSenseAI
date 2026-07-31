@@ -28,6 +28,17 @@ exports.getContractors = asyncHandler(async (req, res) => {
   if (category) filter.category = category;
   if (flagged !== undefined) filter.flagged = flagged === 'true';
 
+  const count = await Contractor.countDocuments();
+  if (count === 0) {
+    await Contractor.insertMany([
+      { name: 'Apex Roadworks', company: 'Apex Infra Ltd', category: 'Roads', rating: 4.8, completedJobs: 34, complaints: 1 },
+      { name: 'CleanCity Sanitation', company: 'CleanCity Services', category: 'Sanitation', rating: 4.6, completedJobs: 52, complaints: 0 },
+      { name: 'HydroFlow Water Corp', company: 'HydroFlow Systems', category: 'Water Supply', rating: 4.5, completedJobs: 28, complaints: 2 },
+      { name: 'VoltLine Electricals', company: 'VoltLine Power', category: 'Electrical', rating: 4.9, completedJobs: 41, complaints: 0 },
+      { name: 'Civic Parks & Infra', company: 'GreenCity Developers', category: 'Parks & Gardens', rating: 4.7, completedJobs: 19, complaints: 1 },
+    ]);
+  }
+
   const { docs, total } = await paginate(Contractor, filter, {
     page, limit, sort: { rating: -1 },
   });

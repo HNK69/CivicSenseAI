@@ -121,18 +121,14 @@ exports.updateMyProfile = asyncHandler(async (req, res) => {
  * Query: status, department, page, limit
  */
 exports.getWorkOrders = asyncHandler(async (req, res) => {
-  const { status, department, page = 1, limit = 20 } = req.query;
+  const { status, department, page = 1, limit = 100 } = req.query;
   const filter = {};
   if (status)     filter.status     = status;
   if (department) filter.department = department;
 
-  // If officer (not admin/supervisor), only show their department
-  if (req.officer.role === 'officer' && req.officer.department) {
-    filter.department = req.officer.department;
-  }
-
   const { docs, total } = await paginate(WorkOrder, filter, {
     page, limit,
+    sort: { createdAt: -1 },
     populate: [
       { path: 'issue',            select: 'title category status priority location' },
       { path: 'assignedOfficer',  select: 'name designation' },
@@ -158,9 +154,8 @@ exports.getWorkOrder = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/officer/work-orders
- * Create a work order from an issue.
+ * Create or assign a work order from an issue to a contractor.
  * Body: { issueId, department, assignedTo (officerId), dueDate?, contractorId?, notes? }
- * Supports: client-officer's assignWorkOrder(issueId, dept, assignedTo)
  */
 exports.createWorkOrder = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -171,63 +166,50 @@ exports.createWorkOrder = asyncHandler(async (req, res) => {
   const issue = await Issue.findById(issueId);
   if (!issue || issue.isDeleted) return error(res, 'Issue not found', 404);
 
-  const wo = await WorkOrder.create({
-    issue:           issueId,
-    issueTitle:      issue.title,
-    department:      department || DEPT_MAP[issue.category] || 'General',
-    assignedOfficer: assignedTo   || null,
-    contractor:      contractorId || null,
-    dueDate:         dueDate      || null,
-    notes:           notes        || null,
-    status:          'pending',
-    history: [{
-      action:    'created',
-      changedBy: req.officer._id,
+  // Check if a work order already exists for this issue
+  let wo = await WorkOrder.findOne({ issue: issueId });
+  if (wo) {
+    if (department)   wo.department = department;
+    if (contractorId) wo.contractor = contractorId;
+    if (assignedTo)   wo.assignedOfficer = assignedTo;
+    if (notes)        wo.notes = notes;
+    if (dueDate)      wo.dueDate = dueDate;
+    wo.status = 'in_progress';
+    wo.history.push({
+      action:    'assigned to contractor',
+      note:      notes || null,
+      changedBy: req.officer?._id || null,
       changedAt: new Date(),
-    }],
-  });
+    });
+    await wo.save();
+  } else {
+    wo = await WorkOrder.create({
+      issue:           issueId,
+      issueTitle:      issue.title,
+      department:      department || DEPT_MAP[issue.category] || 'General',
+      assignedOfficer: assignedTo   || null,
+      contractor:      contractorId || null,
+      dueDate:         dueDate      || null,
+      notes:           notes        || null,
+      status:          'pending',
+      history: [{
+        action:    'created and assigned',
+        changedBy: req.officer?._id || null,
+        changedAt: new Date(),
+      }],
+    });
+  }
 
   // Link work order back to issue + update issue status
   issue.workOrder = wo._id;
-  if (['reported', 'acknowledged'].includes(issue.status)) {
-    issue.status = 'assigned';
-    issue.statusHistory.push({
-      status:    'assigned',
-      changedAt: new Date(),
-      changedByModel: 'Officer',
-      changedBy: req.officer._id,
-      note:      `Work order ${wo._id} created`,
-    });
-  }
+  issue.status = 'assigned';
   if (department) issue.assignedDepartment = department;
-  if (assignedTo) issue.assignedOfficer    = assignedTo;
-  await issue.save();
+  await issue.save({ validateBeforeSave: false });
 
-  // Notify assigned officer
-  if (assignedTo) {
-    await notifyNewAssignment({
-      officerId:   assignedTo,
-      issueId:     issue._id,
-      issueTitle:  issue.title,
-      workOrderId: wo._id,
-    });
-    emitToOfficer(assignedTo.toString(), 'issue:newAssignment', {
-      workOrderId: wo._id,
-      issueId:     issue._id,
-      issueTitle:  issue.title,
-      department:  wo.department,
-    });
-  }
+  // Populate contractor details for real-time socket events & response
+  await wo.populate('contractor', 'name company category rating');
 
-  // Notify department room
-  emitToDepartment(wo.department, 'issue:assigned', {
-    issueId:     issue._id,
-    title:       issue.title,
-    workOrderId: wo._id,
-    department:  wo.department,
-  });
-
-  return created(res, { workOrder: wo }, 'Work order created');
+  return created(res, { workOrder: wo }, 'Work order assigned successfully');
 });
 
 /**

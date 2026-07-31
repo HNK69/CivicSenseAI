@@ -3,12 +3,12 @@ import api from './api';
 /** GET all work orders */
 export async function getWorkOrders() {
   const res = await api.get('/officer/work-orders');
-  return res?.data?.docs || res?.data || res?.docs || res?.workOrders || [];
+  return res?.data?.docs || res?.docs || res?.data?.workOrders || res?.data || [];
 }
 
-/** POST assign a work order to a department/officer */
-export async function assignWorkOrder(issueId, department, officerId) {
-  const res = await api.patch(`/officer/issues/${issueId}/assign`, { department, officerId });
+/** POST assign a work order to a department/contractor */
+export async function assignWorkOrder(issueId, department, contractorId, notes) {
+  const res = await api.post('/officer/work-orders', { issueId, department, contractorId, notes });
   return res?.data || res;
 }
 
