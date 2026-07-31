@@ -7,6 +7,7 @@ import { SubmitButton } from './SubmitButton.jsx';
 import { shake, stagger } from '../../lib/motion.js';
 import { useAuthContext } from '../../context/AuthContext.jsx';
 import { loginOfficer } from '../../services/officerAuthService.js';
+import { loginContractor } from '../../services/contractorAuthService.js';
 
 export function LoginForm({ role }) {
   const [values, setValues] = useState({ email: '', password: '' });
@@ -40,6 +41,8 @@ export function LoginForm({ role }) {
     let result;
     if (role === 'officer') {
       result = await loginOfficer({ email: values.email, password: values.password });
+    } else if (role === 'contractor') {
+      result = await loginContractor({ email: values.email, password: values.password });
     } else {
       result = await login(values.email, values.password);
     }
@@ -48,12 +51,17 @@ export function LoginForm({ role }) {
       setState('success');
       setTimeout(() => {
         if (role === 'officer') {
-          // Pass credentials cross-origin to client-officer (port 5173) via URL params
           const officer = result.officer || {};
           const token   = result.accessToken || '';
           const refresh = result.refreshToken || '';
           const officerUserStr = encodeURIComponent(JSON.stringify(officer));
           window.location.href = `http://localhost:5173/login?token=${token}&refresh=${refresh}&user=${officerUserStr}`;
+        } else if (role === 'contractor') {
+          const contractor = result.contractor || {};
+          const token   = result.accessToken || '';
+          const refresh = result.refreshToken || '';
+          const contractorUserStr = encodeURIComponent(JSON.stringify(contractor));
+          window.location.href = `http://localhost:5173/login?role=contractor&token=${token}&refresh=${refresh}&user=${contractorUserStr}`;
         } else {
           navigate('/dashboard');
         }
@@ -77,11 +85,11 @@ export function LoginForm({ role }) {
       style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
     >
       <Field
-        label="Email address"
+        label={role === 'contractor' ? 'Contractor email' : role === 'officer' ? 'Officer email' : 'Email address'}
         Icon={Mail}
         type="email"
         autoComplete="email"
-        placeholder="name@city.gov"
+        placeholder={role === 'contractor' ? 'contractor@apex.gov.in' : role === 'officer' ? 'officer@civicsense.gov.in' : 'name@city.gov'}
         value={values.email}
         error={errors.email}
         onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
@@ -122,7 +130,7 @@ export function LoginForm({ role }) {
         </button>
       </motion.div>
 
-      <SubmitButton state={state} label="Continue" />
+      <SubmitButton state={state} label={role === 'contractor' ? 'Sign In to Contractor Portal' : role === 'officer' ? 'Sign In to Officer Portal' : 'Continue'} />
     </motion.form>
   );
 }

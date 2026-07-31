@@ -179,23 +179,29 @@ exports.officerLogin = asyncHandler(async (req, res) => {
   if (!errors.isEmpty()) return error(res, 'Validation failed', 400, errors.array());
 
   const { email, password } = req.body;
-  let officer = await Officer.findOne({ email }).select('+passwordHash');
 
-  // Auto-register officer if account does not exist yet
-  if (!officer) {
-    console.log(`[authController] Creating new officer account for ${email}`);
-    officer = await Officer.create({
-      name: email.split('@')[0].replace('.', ' '),
-      email,
-      passwordHash: password,
+  // Auto-seed default officer if no officer accounts exist in database
+  const count = await Officer.countDocuments();
+  if (count === 0) {
+    await Officer.create({
+      name: 'Default Officer',
+      email: 'officer@civicsense.gov.in',
+      passwordHash: 'officer123',
       role: 'officer',
       department: 'PWD',
-      designation: 'Municipal Officer',
+      designation: 'Senior Municipal Officer',
     });
-    officer = await Officer.findById(officer._id).select('+passwordHash');
-  } else {
-    const valid = await officer.comparePassword(password);
-    if (!valid) return error(res, 'Invalid credentials', 401);
+  }
+
+  const officer = await Officer.findOne({ email }).select('+passwordHash');
+
+  if (!officer) {
+    return error(res, 'Officer account not found. Only registered municipal officers can log in.', 401);
+  }
+
+  const valid = await officer.comparePassword(password);
+  if (!valid) {
+    return error(res, 'Invalid password. Access denied.', 401);
   }
 
   if (!officer.isActive) return error(res, 'Account deactivated', 403);
@@ -310,4 +316,66 @@ exports.createOfficer = asyncHandler(async (req, res) => {
   });
 
   return created(res, { officer }, 'Officer account created');
+});
+
+/* ====================================================================
+   CONTRACTOR AUTH
+   ==================================================================== */
+
+/**
+ * POST /api/contractor/auth/login
+ * Body: { email, password }
+ */
+exports.contractorLogin = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return error(res, 'Email and password are required', 400);
+
+  const Contractor = require('../models/Contractor');
+
+  // Auto-seed default contractor if none exists
+  const defaultEmail = 'contractor@apex.gov.in';
+  let contractor = await Contractor.findOne({ email: email.toLowerCase() }).select('+passwordHash');
+
+  if (!contractor && email.toLowerCase() === defaultEmail) {
+    contractor = await Contractor.create({
+      name: 'Apex Roadworks (Demo Contractor)',
+      company: 'Apex Infrastructure Ltd',
+      email: defaultEmail,
+      passwordHash: 'contractor123',
+      category: 'Roads & Infra',
+      rating: 4.8,
+    });
+    // Re-fetch with passwordHash selected
+    contractor = await Contractor.findOne({ email: defaultEmail }).select('+passwordHash');
+  }
+
+  if (!contractor) {
+    return error(res, 'Contractor account not found. Accounts are issued by Municipal Administration.', 401);
+  }
+
+  const valid = await contractor.comparePassword(password);
+  if (!valid) {
+    return error(res, 'Invalid password. Access denied.', 401);
+  }
+
+  if (!contractor.isActive) return error(res, 'Contractor account deactivated', 403);
+
+  const tokenPayload = { id: contractor._id, role: 'contractor', email: contractor.email };
+  const accessToken  = generateAccessToken(tokenPayload);
+  const refreshToken = generateRefreshToken(tokenPayload);
+
+  contractor.refreshTokens = contractor.refreshTokens || [];
+  contractor.refreshTokens.push(refreshToken);
+  contractor.lastActive = new Date();
+  await contractor.save({ validateBeforeSave: false });
+
+  const contractorObj = contractor.toJSON();
+  delete contractorObj.passwordHash;
+  delete contractorObj.refreshTokens;
+
+  return success(res, {
+    contractor: contractorObj,
+    accessToken,
+    refreshToken,
+  }, 'Contractor login successful');
 });

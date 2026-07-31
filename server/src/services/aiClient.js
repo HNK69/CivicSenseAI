@@ -153,8 +153,12 @@ async function copilotChat({
       complaint_id: cid,
       text: c.text || [c.title, c.description].filter(Boolean).join(' - ') || 'Civic issue',
       category: c.category || 'Other',
-      severity: c.severity || c.priority || c.ai_analysis?.severity || null,
-      status: c.status || null,
+      severity: String(c.severity || c.priority || c.ai_analysis?.severity || 'MEDIUM'),
+      status: String(c.status || 'reported'),
+      zone: c.zone || c.ward || 'Zone-A',
+      address: c.address || null,
+      contractor: c.contractor || c.assignedContractor?.name || null,
+      upvotes: Number(c.upvotes || c.upvoteCount || 0),
       created_at: c.created_at || (c.createdAt ? new Date(c.createdAt).toISOString() : null),
     };
   };
@@ -162,17 +166,36 @@ async function copilotChat({
   const rawRecent = complaint_context?.recent_complaints || (complaint_context?.id ? [complaint_context] : []);
   const recent_complaints = rawRecent.map(formatComplaintSummary).filter(Boolean);
 
+  const work_orders = (complaint_context?.work_orders || []).map(w => ({
+    work_order_id: (w._id || w.work_order_id || 'wo-1')?.toString(),
+    issue_title: w.issue_title || w.issue?.title || 'Civic Ticket',
+    department: w.department || 'General',
+    contractor_name: w.contractor_name || w.contractor?.name || 'Assigned Contractor',
+    status: w.status || 'pending',
+    notes: w.notes || null,
+    created_at: w.createdAt ? new Date(w.createdAt).toISOString() : null,
+  }));
+
+  const contractors_summary = (complaint_context?.contractors_summary || []).map(c => ({
+    contractor_id: (c._id || c.contractor_id)?.toString(),
+    name: c.name || 'Contractor',
+    category: c.category || 'General',
+    assigned_count: Number(c.assigned_count || 0),
+    rating: Number(c.rating || 4.5),
+  }));
+
   return callWithRetry(
     () =>
       _client.post('/api/v1/copilot', {
         officer_query: message,
         context: {
-          officer_id: officer_id || 'guest_officer',
           officer_name: officer_name || 'Officer',
           officer_department: officer_department || 'General',
           recent_complaints,
           backlog: (complaint_context?.backlog || []).map(formatComplaintSummary).filter(Boolean),
           priority_queue: (complaint_context?.priority_queue || []).map(formatComplaintSummary).filter(Boolean),
+          work_orders,
+          contractors_summary,
         },
       }),
     'copilotChat'

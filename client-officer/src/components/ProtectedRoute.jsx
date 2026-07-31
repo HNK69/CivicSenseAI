@@ -7,7 +7,8 @@ export default function ProtectedRoute({ children }) {
   const token = localStorage.getItem('officer_token');
 
   if (!isAuthenticated && !token) {
-    return <Navigate to="/login" replace />;
+    window.location.href = 'http://localhost:3000/login';
+    return null;
   }
 
   return children;

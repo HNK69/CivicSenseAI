@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('officer_token');
     localStorage.removeItem('officer_refresh');
     localStorage.removeItem('officer_user');
-    window.location.href = '/login';
+    window.location.href = 'http://localhost:3000/login';
   };
 
   return (

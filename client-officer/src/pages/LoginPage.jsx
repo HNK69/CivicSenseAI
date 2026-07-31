@@ -24,23 +24,26 @@ export default function OfficerLoginPage() {
     const token   = searchParams.get('token');
     const refresh = searchParams.get('refresh');
     const userRaw = searchParams.get('user');
+    const role    = searchParams.get('role');
 
     if (!token || !userRaw) return;
 
     setTokenLoading(true);
     try {
-      const officerUser = JSON.parse(decodeURIComponent(userRaw));
+      const parsedUser = JSON.parse(decodeURIComponent(userRaw));
 
-      // Write directly into localStorage first so ProtectedRoute sees it immediately
-      localStorage.setItem('officer_token', token);
-      localStorage.setItem('officer_user', JSON.stringify(officerUser));
-      if (refresh) localStorage.setItem('officer_refresh', refresh);
-
-      // Update AuthContext state
-      login(token, officerUser);
-
-      // Use replace to clean the URL and avoid back-button re-processing
-      window.location.replace('/dashboard');
+      if (role === 'contractor') {
+        localStorage.setItem('contractor_token', token);
+        localStorage.setItem('contractor_user', JSON.stringify(parsedUser));
+        if (refresh) localStorage.setItem('contractor_refresh', refresh);
+        window.location.replace('/contractor');
+      } else {
+        localStorage.setItem('officer_token', token);
+        localStorage.setItem('officer_user', JSON.stringify(parsedUser));
+        if (refresh) localStorage.setItem('officer_refresh', refresh);
+        login(token, parsedUser);
+        window.location.replace('/dashboard');
+      }
     } catch (err) {
       console.error('[OfficerLoginPage] Failed to parse cross-origin credentials', err);
       setError('Authentication failed. Please try logging in directly.');
@@ -207,6 +210,15 @@ export default function OfficerLoginPage() {
             {loading ? 'Authenticating…' : 'Sign In to Officer Portal'}
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
+          <a
+            href="http://localhost:3000/login"
+            style={{ color: '#60A5FA', fontSize: '0.85rem', textDecoration: 'none' }}
+          >
+            &larr; Return to Main CivicSense AI Login
+          </a>
+        </div>
       </motion.div>
     </div>
   );

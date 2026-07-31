@@ -1,4 +1,4 @@
-import { Building2, UserRound } from 'lucide-react';
+import { Building2, UserRound, HardHat } from 'lucide-react';
 
 export const ROLES = [
   {
@@ -14,6 +14,13 @@ export const ROLES = [
     description: 'Manage complaints and coordinate resolutions.',
     portal: 'Officer Portal',
     Icon: Building2,
+  },
+  {
+    id: 'contractor',
+    title: 'Contractor',
+    description: 'Execute assigned work orders & submit evidence.',
+    portal: 'Contractor Portal',
+    Icon: HardHat,
   },
 ];
 

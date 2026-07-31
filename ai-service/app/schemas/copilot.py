@@ -18,7 +18,33 @@ class ComplaintSummary(BaseModel):
     category: str
     severity: str | None = None
     status: str | None = None
+    zone: str | None = None
+    address: str | None = None
+    contractor: str | None = None
+    upvotes: int | None = 0
     created_at: str | None = None
+
+
+class WorkOrderSummary(BaseModel):
+    """A brief summary of a work order."""
+
+    work_order_id: str | None = None
+    issue_title: str | None = None
+    department: str | None = None
+    contractor_name: str | None = None
+    status: str | None = None
+    notes: str | None = None
+    created_at: str | None = None
+
+
+class ContractorSummary(BaseModel):
+    """A brief summary of a contractor performance/load."""
+
+    contractor_id: str | None = None
+    name: str | None = None
+    category: str | None = None
+    assigned_count: int | None = 0
+    rating: float | None = None
 
 
 class CopilotContext(BaseModel):
@@ -30,6 +56,8 @@ class CopilotContext(BaseModel):
     recent_complaints: list[ComplaintSummary] = Field(default_factory=list)
     backlog: list[ComplaintSummary] = Field(default_factory=list)
     priority_queue: list[ComplaintSummary] = Field(default_factory=list)
+    work_orders: list[WorkOrderSummary] = Field(default_factory=list)
+    contractors_summary: list[ContractorSummary] = Field(default_factory=list)
     officer_name: str | None = None
     officer_department: str | None = None
 

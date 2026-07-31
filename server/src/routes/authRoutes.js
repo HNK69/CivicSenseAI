@@ -76,4 +76,13 @@ officerAuthRouter.post('/create', vt, requireAdmin, [
   body('role').isIn(['officer', 'supervisor', 'admin']).optional(),
 ], auth.createOfficer);
 
-module.exports = { citizenAuthRouter: router, officerAuthRouter };
+/* ====================================================================
+   CONTRACTOR AUTH — mounted at /api/contractor/auth
+   ==================================================================== */
+const contractorAuthRouter = require('express').Router();
+contractorAuthRouter.post('/login', [
+  body('email').isEmail().normalizeEmail(),
+  body('password').notEmpty(),
+], auth.contractorLogin);
+
+module.exports = { citizenAuthRouter: router, officerAuthRouter, contractorAuthRouter };

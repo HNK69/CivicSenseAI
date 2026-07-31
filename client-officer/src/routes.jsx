@@ -13,11 +13,16 @@ import AssignWork            from './pages/AssignWork.jsx';
 import RepairVerification    from './pages/RepairVerification.jsx';
 import ContractorPerformance from './pages/ContractorPerformance.jsx';
 import MunicipalCopilot      from './pages/MunicipalCopilot.jsx';
+import ContractorDashboard   from './pages/ContractorDashboard.jsx';
 
 const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/contractor',
+    element: <ContractorDashboard />,
   },
   {
     path: '/',

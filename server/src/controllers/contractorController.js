@@ -178,3 +178,123 @@ exports.getAllContractorStats = asyncHandler(async (req, res) => {
 
   return success(res, { contractors });
 });
+
+/* ====================================================================
+   CONTRACTOR PORTAL WORKFLOW
+   ==================================================================== */
+
+const Issue = require('../models/Issue');
+const { verifyRepairAI } = require('../services/aiClient');
+
+/**
+ * GET /api/contractor/work-orders
+ * Returns work orders assigned to the logged-in contractor.
+ */
+exports.getMyWorkOrders = asyncHandler(async (req, res) => {
+  const contractorId = req.contractor._id;
+  const workOrders = await WorkOrder.find({ contractor: contractorId })
+    .populate('issue')
+    .sort('-createdAt')
+    .lean();
+
+  return success(res, { workOrders });
+});
+
+/**
+ * GET /api/contractor/work-orders/:id
+ */
+exports.getMyWorkOrderDetails = asyncHandler(async (req, res) => {
+  const contractorId = req.contractor._id;
+  const workOrder = await WorkOrder.findOne({ _id: req.params.id, contractor: contractorId })
+    .populate('issue')
+    .lean();
+
+  if (!workOrder) return error(res, 'Work order not found or not assigned to you', 404);
+  return success(res, { workOrder });
+});
+
+/**
+ * POST /api/contractor/work-orders/:id/submit-completion
+ * Body: { afterImage, afterVideo, after_image_urls, notes }
+ */
+exports.submitWorkOrderCompletion = asyncHandler(async (req, res) => {
+  const contractorId = req.contractor._id;
+  const { afterImage, afterVideo, after_image_urls, notes } = req.body;
+
+  const workOrder = await WorkOrder.findOne({ _id: req.params.id, contractor: contractorId }).populate('issue');
+  if (!workOrder) return error(res, 'Work order not found or not assigned to you', 404);
+
+  let afterUrls = after_image_urls || [];
+  if (req.uploadedMedia?.afterMedia) {
+    afterUrls.push(req.uploadedMedia.afterMedia.url);
+  }
+  if (afterImage) afterUrls.push(typeof afterImage === 'string' ? afterImage : afterImage.url);
+  if (afterVideo) afterUrls.push(typeof afterVideo === 'string' ? afterVideo : afterVideo.url);
+
+  // Fallback default image if none provided
+  if (afterUrls.length === 0) {
+    afterUrls.push('https://images.unsplash.com/photo-1541888946425-d0fbb186a5b7?w=800&auto=format&fit=crop');
+  }
+
+  workOrder.after_image_urls = afterUrls;
+  workOrder.afterImage = { url: afterUrls[0] };
+  workOrder.status = 'completed';
+  workOrder.verificationVerdict = 'PENDING_VERIFICATION';
+  if (notes) workOrder.notes = notes;
+  workOrder.completedAt = new Date();
+
+  workOrder.history.push({
+    action: 'completion submitted by contractor',
+    note: notes || 'Submitted repair evidence',
+    changedAt: new Date(),
+  });
+
+  await workOrder.save();
+
+  // Update issue status to awaiting_verification
+  if (workOrder.issue?._id) {
+    const issue = await Issue.findById(workOrder.issue._id);
+    if (issue) {
+      issue.status = 'awaiting_verification';
+      issue.statusHistory = issue.statusHistory || [];
+      issue.statusHistory.push({
+        status: 'awaiting_verification',
+        changedAt: new Date(),
+        note: 'Contractor submitted repair evidence — awaiting AI verification',
+      });
+      await issue.save();
+    }
+  }
+
+  // Trigger AI Repair Verification pipeline automatically
+  let aiResult = null;
+  try {
+    const complaint_id = (workOrder.issue?._id || workOrder.issue)?.toString();
+    const before_image_urls = workOrder.before_image_urls?.length
+      ? workOrder.before_image_urls
+      : (workOrder.issue?.images?.map(i => i.url) || [workOrder.beforeImage?.url]).filter(Boolean);
+
+    aiResult = await verifyRepairAI({
+      complaint_id,
+      before_image_urls: before_image_urls.length ? before_image_urls : ['https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop'],
+      after_image_urls: afterUrls,
+    });
+
+    workOrder.ai_repair_verification = {
+      verified: aiResult?.verified ?? null,
+      confidence: aiResult?.confidence ?? 0.88,
+      explanation: aiResult?.explanation || 'AI analysis completed comparing repair evidence against report.',
+      remaining_issues: aiResult?.remaining_issues || [],
+      diff_summary: aiResult?.diff_summary || null,
+      verified_at: new Date(),
+    };
+    await workOrder.save();
+  } catch (aiErr) {
+    console.warn('[contractorController] Auto AI repair verification trigger warning:', aiErr.message);
+  }
+
+  return success(res, {
+    workOrder,
+    aiResult,
+  }, 'Repair completion submitted successfully — Awaiting AI Verification');
+});

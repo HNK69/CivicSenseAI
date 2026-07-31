@@ -6,8 +6,8 @@ export async function getRepairs() {
   return res?.data?.repairs || res?.data?.docs || res?.data || res?.repairs || [];
 }
 
-/** POST verify/reject a repair using AI verify-repair endpoint */
-export async function verifyRepair(id, verdict) {
-  const res = await api.post(`/officer/repairs/${id}/verify`, { verdict });
+/** POST verify/reject/rework a repair using AI verify-repair endpoint */
+export async function verifyRepair(id, verdict, note = '') {
+  const res = await api.post(`/officer/repairs/${id}/verify`, { verdict, note });
   return res?.data || res;
 }

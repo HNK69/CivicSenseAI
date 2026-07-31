@@ -4,10 +4,10 @@ const cors    = require('cors');
 const morgan  = require('morgan');
 const path    = require('path');
 
-const { citizenAuthRouter, officerAuthRouter } = require('./routes/authRoutes');
+const { citizenAuthRouter, officerAuthRouter, contractorAuthRouter } = require('./routes/authRoutes');
 const { citizenIssueRouter, officerIssueRouter } = require('./routes/issueRoutes');
 const officerRoutes      = require('./routes/officerRoutes');
-const contractorRoutes   = require('./routes/contractorRoutes');
+const { officerContractorRouter, contractorPortalRouter } = require('./routes/contractorRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
@@ -56,6 +56,9 @@ app.use('/api/auth', citizenAuthRouter);
 // ---- Officer auth ----
 app.use('/api/officer/auth', officerAuthRouter);
 
+// ---- Contractor auth ----
+app.use('/api/contractor/auth', contractorAuthRouter);
+
 // ---- Citizen issues ----
 app.use('/api/issues', citizenIssueRouter);
 
@@ -65,10 +68,13 @@ app.use('/api/officer/issues', officerIssueRouter);
 // ---- Officer management, work orders, repairs, stats, copilot, duplicates ----
 app.use('/api/officer', officerRoutes);
 
-// ---- Contractor management ----
-app.use('/api/officer/contractors', contractorRoutes);
+// ---- Officer contractor management ----
+app.use('/api/officer/contractors', officerContractorRouter);
 
-// ---- Notifications (role-aware — citizen + officer) ----
+// ---- Contractor Portal ----
+app.use('/api/contractor', contractorPortalRouter);
+
+// ---- Notifications (role-aware — citizen + officer + contractor) ----
 app.use('/api/notifications', notificationRoutes);
 
 /* ====================================================================

@@ -79,29 +79,6 @@ const AppNavbar = () => {
 
         {/* ── Right actions ── */}
         <div className="d-flex align-items-center gap-2 ms-auto">
-          {/* Bell */}
-          <motion.button
-            className="nav-bell position-relative"
-            onClick={() => navigate('/notifications')}
-            aria-label="Notifications"
-            id="nav-notifications-btn"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <i className="bi bi-bell" />
-            {unreadCount > 0 && (
-              <motion.span
-                className="badge bell-badge"
-                id="notif-badge"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 500 }}
-              >
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </motion.span>
-            )}
-          </motion.button>
-
           {/* Avatar dropdown */}
           <Dropdown align="end">
             <Dropdown.Toggle
@@ -135,11 +112,11 @@ const AppNavbar = () => {
                   {user?.ward}{user?.city ? ` · ${user.city}` : ''}
                 </div>
               </div>
-              <Dropdown.Item className="d-flex align-items-center gap-2" onClick={() => navigate('/')} id="nav-profile-link">
-                <i className="bi bi-person" style={{ color: 'var(--civic-blue)' }} />Profile
+              <Dropdown.Item className="d-flex align-items-center gap-2" onClick={() => navigate('/status')} id="nav-profile-link">
+                <i className="bi bi-person" style={{ color: 'var(--civic-blue)' }} />My Submissions
               </Dropdown.Item>
-              <Dropdown.Item className="d-flex align-items-center gap-2" onClick={() => navigate('/')} id="nav-settings-link">
-                <i className="bi bi-gear" style={{ color: 'var(--text-muted)' }} />Settings
+              <Dropdown.Item className="d-flex align-items-center gap-2" onClick={() => navigate('/map')} id="nav-settings-link">
+                <i className="bi bi-map" style={{ color: 'var(--text-muted)' }} />Nearby Map
               </Dropdown.Item>
               <Dropdown.Divider />
               <Dropdown.Item className="d-flex align-items-center gap-2" style={{ color: 'var(--red)' }} onClick={logout} id="nav-logout-btn">

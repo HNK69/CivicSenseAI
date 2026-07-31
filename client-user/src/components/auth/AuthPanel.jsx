@@ -144,26 +144,34 @@ export function AuthPanel({ defaultRole = 'citizen' }) {
               style={{
                 marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 gap: '0.5rem', borderTop: '1px solid rgba(36,59,83,0.1)', paddingTop: '1.25rem',
-                fontSize: '0.875rem',
+                fontSize: '0.85rem', textAlign: 'center',
               }}
             >
-              <span style={{ color: 'var(--text-secondary)' }}>
-                {mode === 'login' ? "Don't have an account?" : 'Already registered?'}
-              </span>
-              <motion.button
-                type="button"
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => setMode((m) => (m === 'login' ? 'signup' : 'login'))}
-                style={{
-                  fontWeight: 500, color: 'var(--text-primary)', background: 'none',
-                  border: 'none', cursor: 'pointer', fontSize: '0.875rem', padding: 0,
-                  position: 'relative',
-                }}
-                className="auth-link-underline"
-              >
-                {mode === 'login' ? 'Create account' : 'Sign in'}
-              </motion.button>
+              {role === 'citizen' ? (
+                <>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {mode === 'login' ? "Don't have an account?" : 'Already registered?'}
+                  </span>
+                  <motion.button
+                    type="button"
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => setMode((m) => (m === 'login' ? 'signup' : 'login'))}
+                    style={{
+                      fontWeight: 500, color: 'var(--text-primary)', background: 'none',
+                      border: 'none', cursor: 'pointer', fontSize: '0.85rem', padding: 0,
+                      position: 'relative',
+                    }}
+                    className="auth-link-underline"
+                  >
+                    {mode === 'login' ? 'Create account' : 'Sign in'}
+                  </motion.button>
+                </>
+              ) : (
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500 }}>
+                  🔒 Internal {role === 'contractor' ? 'Contractor' : 'Officer'} Account Only · Issued by Municipal Admin
+                </span>
+              )}
             </motion.div>
           )}
         </LayoutGroup>
